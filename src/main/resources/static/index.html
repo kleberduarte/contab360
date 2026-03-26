@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Contabilidade PJ</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header__inner">
+            <h1 class="header__title">Contabilidade PJ</h1>
+            <p class="header__subtitle">Centralize financeiro, fiscal e societário para seus clientes.</p>
+        </div>
+    </header>
+
+    <main class="main">
+        <section class="card" aria-labelledby="status-title">
+            <h2 id="status-title">Status da API</h2>
+            <p id="health-status" class="muted">Verificando…</p>
+        </section>
+
+        <section class="card" aria-labelledby="empresas-title">
+            <h2 id="empresas-title">Empresas cadastradas</h2>
+            <ul id="lista-empresas" class="lista"></ul>
+            <p id="empresas-empty" class="muted hidden">Nenhuma empresa ainda.</p>
+        </section>
+
+        <section class="card" aria-labelledby="nova-title">
+            <h2 id="nova-title">Nova empresa (teste)</h2>
+            <form id="form-empresa" class="form">
+                <label>
+                    CNPJ (14 dígitos, só números)
+                    <input type="text" name="cnpj" id="cnpj" maxlength="14" pattern="\d{14}" required placeholder="00000000000000">
+                </label>
+                <label>
+                    Razão social
+                    <input type="text" name="razaoSocial" id="razaoSocial" required placeholder="Nome da empresa LTDA">
+                </label>
+                <button type="submit" class="btn">Cadastrar</button>
+            </form>
+            <p id="form-feedback" class="feedback" role="status"></p>
+        </section>
+    </main>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
