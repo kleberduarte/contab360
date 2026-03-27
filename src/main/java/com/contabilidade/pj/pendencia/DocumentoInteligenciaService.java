@@ -2,13 +2,21 @@ package com.contabilidade.pj.pendencia;
 
 import com.contabilidade.pj.auth.PerfilUsuario;
 import com.contabilidade.pj.auth.Usuario;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -24,20 +32,27 @@ import org.w3c.dom.NodeList;
 public class DocumentoInteligenciaService {
 
     private static final Pattern CNPJ_PATTERN = Pattern.compile("\\b\\d{14}\\b");
+    private static final Pattern CNPJ_FORMATADO_PATTERN = Pattern.compile("\\b\\d{2}\\.?\\d{3}\\.?\\d{3}[/\\-]?\\d{4}[\\-]?\\d{2}\\b");
     private static final Pattern VALOR_PATTERN = Pattern.compile("(\\d+[\\.,]\\d{2})");
+    private static final Pattern COMPETENCIA_PATTERN = Pattern.compile("\\b(\\d{2})/(\\d{4})\\b|\\b(\\d{4})-(\\d{2})\\b");
+    private static final Pattern DATA_PATTERN = Pattern.compile("\\b(\\d{2}/\\d{2}/\\d{4})\\b");
 
     private final DocumentoProcessamentoRepository documentoProcessamentoRepository;
     private final TemplateDocumentoRepository templateDocumentoRepository;
     private final RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository;
+    private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentoInteligenciaService(
             DocumentoProcessamentoRepository documentoProcessamentoRepository,
             TemplateDocumentoRepository templateDocumentoRepository,
-            RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository
+            RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository,
+            PendenciaDocumentoRepository pendenciaDocumentoRepository
     ) {
         this.documentoProcessamentoRepository = documentoProcessamentoRepository;
         this.templateDocumentoRepository = templateDocumentoRepository;
         this.revisaoDocumentoHistoricoRepository = revisaoDocumentoHistoricoRepository;
+        this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
     }
 
     @Transactional
@@ -89,6 +104,9 @@ public class DocumentoInteligenciaService {
         item.setStatus(ProcessamentoStatus.PROCESSADO);
         item.setObservacaoProcessamento("Aprovado em revisão manual.");
         item.setAtualizadoEm(LocalDateTime.now());
+        PendenciaDocumento pendencia = item.getEntrega().getPendencia();
+        pendencia.setStatus(PendenciaStatus.VALIDADO);
+        pendenciaDocumentoRepository.save(pendencia);
         DocumentoProcessamento salvo = documentoProcessamentoRepository.save(item);
         registrarHistorico(salvo, "APROVADO_MANUAL", "Aprovado pelo contador.", usuarioAtual.getNome());
         return salvo;
@@ -104,10 +122,13 @@ public class DocumentoInteligenciaService {
         }
         DocumentoProcessamento item = documentoProcessamentoRepository.findById(processamentoId)
                 .orElseThrow(() -> new IllegalArgumentException("Documento de processamento não encontrado."));
-        item.setStatus(ProcessamentoStatus.REVISAR);
+        item.setStatus(ProcessamentoStatus.REJEITADO);
         item.setSeveridade(SeveridadeRevisao.ALTA);
         item.setObservacaoProcessamento("Rejeitado: " + motivo.trim());
         item.setAtualizadoEm(LocalDateTime.now());
+        PendenciaDocumento pendencia = item.getEntrega().getPendencia();
+        pendencia.setStatus(PendenciaStatus.REJEITADO);
+        pendenciaDocumentoRepository.save(pendencia);
         DocumentoProcessamento salvo = documentoProcessamentoRepository.save(item);
         registrarHistorico(salvo, "REJEITADO_MANUAL", motivo.trim(), usuarioAtual.getNome());
         return salvo;
@@ -142,11 +163,11 @@ public class DocumentoInteligenciaService {
 
         processamento.setTipoDocumento("ARQUIVO_NAO_SUPORTADO");
         processamento.setConfianca(0.2);
-        processamento.setStatus(ProcessamentoStatus.REVISAR);
+        processamento.setStatus(ProcessamentoStatus.REJEITADO);
         processamento.setObservacaoProcessamento("Extensão ainda não suportada para leitura automática.");
         processamento.setSeveridade(SeveridadeRevisao.MEDIA);
         processamento.setAtualizadoEm(LocalDateTime.now());
-        documentoProcessamentoRepository.save(processamento);
+        finalizarProcessamentoAutomatico(processamento, "ARQUIVO_NAO_SUPORTADO");
     }
 
     private void processarTexto(DocumentoProcessamento processamento, Path path) throws IOException {
@@ -166,11 +187,11 @@ public class DocumentoInteligenciaService {
         if (texto.isBlank()) {
             processamento.setTipoDocumento("OCR_INDISPONIVEL");
             processamento.setConfianca(0.25);
-            processamento.setStatus(ProcessamentoStatus.REVISAR);
+            processamento.setStatus(ProcessamentoStatus.REJEITADO);
             processamento.setObservacaoProcessamento("OCR não disponível. Instale Tesseract no servidor para leitura de imagens.");
             processamento.setSeveridade(SeveridadeRevisao.MEDIA);
             processamento.setAtualizadoEm(LocalDateTime.now());
-            documentoProcessamentoRepository.save(processamento);
+            finalizarProcessamentoAutomatico(processamento, "OCR_INDISPONIVEL");
             return;
         }
 
@@ -194,6 +215,8 @@ public class DocumentoInteligenciaService {
         String cnpjEmit = coalesce(firstTagValue(doc, "CNPJ"), firstTagValue(doc, "Cnpj"));
         String cnpjDest = coalesce(firstTagValue(doc, "CNPJDest"), firstTagValue(doc, "CPFCNPJTomador"));
         String valor = firstTagValue(doc, "vNF");
+        String competencia = coalesce(firstTagValue(doc, "Competencia"), firstTagValue(doc, "competencia"));
+        String vencimento = coalesce(firstTagValue(doc, "dVenc"), firstTagValue(doc, "dataVencimento"));
         if (valor == null || valor.isBlank()) {
             valor = firstTagValue(doc, "vServ");
         }
@@ -201,27 +224,58 @@ public class DocumentoInteligenciaService {
         String tipo = inferirTipoXml(doc);
         ProcessamentoStatus status = ProcessamentoStatus.PROCESSADO;
         double confianca = 0.92;
+        List<String> motivosRevisao = new ArrayList<>();
 
         String cnpjPrincipal = !cnpjEmit.isBlank() ? cnpjEmit : cnpjDest;
         String observacao = "XML processado com alta confiança.";
-        String validacao = validarComPendencia(processamento, tipo, cnpjPrincipal);
+        String validacao = validarComPendencia(processamento, tipo, cnpjPrincipal, cnpjDest);
         if (!validacao.isBlank()) {
-            status = ProcessamentoStatus.REVISAR;
+            status = ProcessamentoStatus.REJEITADO;
             confianca = 0.7;
             observacao = validacao;
+            motivosRevisao.add(validacao);
+        }
+
+        if (cnpjPrincipal.isBlank()) {
+            status = ProcessamentoStatus.REJEITADO;
+            confianca = Math.min(confianca, 0.65);
+            motivosRevisao.add("CNPJ nao identificado no documento.");
+        }
+        if (valor == null || valor.isBlank()) {
+            status = ProcessamentoStatus.REJEITADO;
+            confianca = Math.min(confianca, 0.68);
+            motivosRevisao.add("Valor principal nao identificado no documento.");
         }
 
         processamento.setTipoDocumento(tipo);
         processamento.setConfianca(confianca);
         processamento.setStatus(status);
-        processamento.setDadosExtraidosJson(
-                "{\"fonte\":\"xml\",\"tipoDocumento\":\"" + safe(tipo) + "\",\"cnpjEmitente\":\"" + safe(cnpjEmit)
-                        + "\",\"cnpjDestinatario\":\"" + safe(cnpjDest) + "\",\"valor\":\"" + safe(valor) + "\"}"
-        );
+        Map<String, String> campos = new LinkedHashMap<>();
+        campos.put("cnpjEmitente", safe(cnpjEmit));
+        campos.put("cnpjDestinatario", safe(cnpjDest));
+        campos.put("valor", safe(valor));
+        campos.put("competencia", normalizarCompetencia(competencia));
+        campos.put("vencimento", normalizarData(vencimento));
+        campos.put("tributo", inferirTributo(tipo));
+        aplicarValidacoesContabeis(processamento, tipo, campos, motivosRevisao);
+        if (!motivosRevisao.isEmpty()) {
+            status = ProcessamentoStatus.REJEITADO;
+            confianca = Math.min(confianca, 0.67);
+            observacao = motivosRevisao.get(0);
+        }
+
+        processamento.setDadosExtraidosJson(montarDadosExtraidosJson(
+                "xml",
+                tipo,
+                campos,
+                confianca,
+                status == ProcessamentoStatus.PROCESSADO ? "SUCESSO" : "REJEITADO",
+                motivosRevisao
+        ));
         processamento.setObservacaoProcessamento(observacao);
         processamento.setSeveridade(status == ProcessamentoStatus.PROCESSADO ? SeveridadeRevisao.BAIXA : SeveridadeRevisao.MEDIA);
         processamento.setAtualizadoEm(LocalDateTime.now());
-        documentoProcessamentoRepository.save(processamento);
+        finalizarProcessamentoAutomatico(processamento, "PROCESSAMENTO_XML");
     }
 
     private String firstTagValue(Document doc, String tag) {
@@ -233,32 +287,28 @@ public class DocumentoInteligenciaService {
     }
 
     private String inferirTipo(String texto) {
-        String base = texto.toLowerCase(Locale.ROOT);
-        if (base.contains("nota fiscal") || base.contains("nfse") || base.contains("nfs-e")) {
-            return "NOTA_FISCAL";
-        }
-        if (base.contains("extrato")) {
-            return "EXTRATO_BANCARIO";
-        }
-        if (base.contains("holerite") || base.contains("folha")) {
-            return "FOLHA_PAGAMENTO";
-        }
-        return "DESCONHECIDO";
+        return TipoDocumentoCatalogo.detectarPorTexto(texto);
     }
 
     private String inferirTipoXml(Document doc) {
-        if (!firstTagValue(doc, "infNFe").isBlank() || !firstTagValue(doc, "NFe").isBlank()) {
-            return "NFE_XML";
-        }
-        if (!firstTagValue(doc, "CompNfse").isBlank() || !firstTagValue(doc, "InfNfse").isBlank()) {
-            return "NFSE_XML";
-        }
-        return "DOCUMENTO_FISCAL_XML";
+        boolean isNfe = !firstTagValue(doc, "infNFe").isBlank() || !firstTagValue(doc, "NFe").isBlank();
+        boolean isNfse = !firstTagValue(doc, "CompNfse").isBlank() || !firstTagValue(doc, "InfNfse").isBlank();
+        return TipoDocumentoCatalogo.detectarPorXml(isNfe, isNfse);
     }
 
     private String extrairCnpj(String texto) {
-        Matcher matcher = CNPJ_PATTERN.matcher(texto.replaceAll("[^0-9]", " "));
-        return matcher.find() ? matcher.group() : "";
+        String conteudo = texto == null ? "" : texto;
+
+        Matcher formatado = CNPJ_FORMATADO_PATTERN.matcher(conteudo);
+        while (formatado.find()) {
+            String normalizado = formatado.group().replaceAll("\\D", "");
+            if (normalizado.length() == 14) {
+                return normalizado;
+            }
+        }
+
+        Matcher bruto = CNPJ_PATTERN.matcher(conteudo.replaceAll("[^0-9]", " "));
+        return bruto.find() ? bruto.group() : "";
     }
 
     private String extrairValor(String texto) {
@@ -266,88 +316,164 @@ public class DocumentoInteligenciaService {
         return matcher.find() ? matcher.group(1) : "";
     }
 
+    private String extrairCnpjAposRotulo(String texto, String rotuloRegex) {
+        if (texto == null || texto.isBlank()) {
+            return "";
+        }
+
+        Pattern rotulo = Pattern.compile(rotuloRegex, Pattern.CASE_INSENSITIVE);
+        Matcher matcherRotulo = rotulo.matcher(texto);
+        if (!matcherRotulo.find()) {
+            return "";
+        }
+
+        int inicio = matcherRotulo.start();
+        int fim = Math.min(texto.length(), inicio + 240);
+        String trecho = texto.substring(inicio, fim);
+        return extrairPrimeiroCnpjValido(trecho);
+    }
+
+    private String extrairPrimeiroCnpjValido(String texto) {
+        Matcher formatado = CNPJ_FORMATADO_PATTERN.matcher(texto == null ? "" : texto);
+        while (formatado.find()) {
+            String normalizado = formatado.group().replaceAll("\\D", "");
+            if (normalizado.length() == 14) {
+                return normalizado;
+            }
+        }
+        return "";
+    }
+
+    private String extrairCnpjPrestador(String texto) {
+        return extrairCnpjAposRotulo(texto, "(prestador|emitente)");
+    }
+
+    private String extrairCnpjTomador(String texto) {
+        return extrairCnpjAposRotulo(texto, "(tomador|destinatario|cliente)");
+    }
+
     private String safe(String value) {
         return value == null ? "" : value.replace("\"", "'");
+    }
+
+    private String montarDadosExtraidosJson(
+            String fonte,
+            String tipoDocumento,
+            Map<String, String> campos,
+            double confianca,
+            String status,
+            List<String> motivosRevisao
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("fonte", safe(fonte));
+        payload.put("tipoDocumento", safe(tipoDocumento));
+        payload.put("status", status);
+        payload.put("confianca", confianca);
+        payload.put("camposObrigatorios", TipoDocumentoCatalogo.camposObrigatorios(tipoDocumento));
+        payload.put("camposExtraidos", campos);
+        payload.put("motivosRevisao", motivosRevisao);
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            return "{\"fonte\":\"" + safe(fonte) + "\",\"tipoDocumento\":\"" + safe(tipoDocumento) + "\"}";
+        }
     }
 
     private String coalesce(String a, String b) {
         return (a != null && !a.isBlank()) ? a : (b == null ? "" : b);
     }
 
-    private void aplicarResultadoExtraido(
-            DocumentoProcessamento processamento,
-            String fonte,
-            String texto,
-            String tipo,
-            double confiancaBase
-    ) {
-        String cnpj = extrairCnpj(texto);
-        String valor = extrairValor(texto);
-        double confianca = "DESCONHECIDO".equals(tipo) ? Math.min(confiancaBase, 0.45) : confiancaBase;
-        ProcessamentoStatus status = confianca >= 0.75 ? ProcessamentoStatus.PROCESSADO : ProcessamentoStatus.REVISAR;
-        String observacao = status == ProcessamentoStatus.PROCESSADO
-                ? "Documento processado automaticamente."
-                : "Baixa confiança na leitura automática.";
-        SeveridadeRevisao severidade = status == ProcessamentoStatus.PROCESSADO ? SeveridadeRevisao.BAIXA : SeveridadeRevisao.MEDIA;
-
-        String validacao = validarComPendencia(processamento, tipo, cnpj);
-        if (!validacao.isBlank()) {
-            status = ProcessamentoStatus.REVISAR;
-            observacao = validacao;
-            confianca = Math.min(confianca, 0.7);
-            severidade = validacao.toLowerCase(Locale.ROOT).contains("cnpj")
-                    ? SeveridadeRevisao.ALTA
-                    : SeveridadeRevisao.MEDIA;
+    private String extrairCompetencia(String texto) {
+        Matcher matcher = COMPETENCIA_PATTERN.matcher(texto == null ? "" : texto);
+        if (!matcher.find()) {
+            return "";
         }
-
-        processamento.setTipoDocumento(tipo);
-        processamento.setConfianca(confianca);
-        processamento.setStatus(status);
-        processamento.setDadosExtraidosJson(
-                "{\"fonte\":\"" + safe(fonte) + "\",\"tipoDocumento\":\"" + safe(tipo)
-                        + "\",\"cnpj\":\"" + safe(cnpj) + "\",\"valor\":\"" + safe(valor) + "\"}"
-        );
-        processamento.setObservacaoProcessamento(observacao);
-        processamento.setSeveridade(severidade);
-        processamento.setAtualizadoEm(LocalDateTime.now());
-        documentoProcessamentoRepository.save(processamento);
+        if (matcher.group(1) != null && matcher.group(2) != null) {
+            return matcher.group(2) + "-" + matcher.group(1);
+        }
+        return matcher.group(3) + "-" + matcher.group(4);
     }
 
-    private String validarComPendencia(DocumentoProcessamento processamento, String tipoDetectado, String cnpjDetectado) {
-        PendenciaDocumento pendencia = processamento.getEntrega().getPendencia();
-        String nomeTemplate = pendencia.getTemplateDocumento().getNome().toLowerCase(Locale.ROOT);
+    private String extrairData(String texto) {
+        Matcher matcher = DATA_PATTERN.matcher(texto == null ? "" : texto);
+        return matcher.find() ? matcher.group(1) : "";
+    }
 
-        if (!cnpjDetectado.isBlank()) {
-            String cnpjEmpresa = pendencia.getEmpresa().getCnpj();
-            if (!cnpjEmpresa.equals(cnpjDetectado)) {
-                return "CNPJ do documento difere da empresa da pendência. Revisar.";
+    private String normalizarCompetencia(String competencia) {
+        if (competencia == null || competencia.isBlank()) {
+            return "";
+        }
+        String c = competencia.trim();
+        if (c.matches("\\d{4}-\\d{2}")) {
+            return c;
+        }
+        if (c.matches("\\d{2}/\\d{4}")) {
+            String[] p = c.split("/");
+            return p[1] + "-" + p[0];
+        }
+        return c;
+    }
+
+    private String normalizarData(String data) {
+        if (data == null || data.isBlank()) {
+            return "";
+        }
+        String d = data.trim();
+        if (d.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            return d;
+        }
+        if (d.matches("\\d{2}/\\d{2}/\\d{4}")) {
+            try {
+                LocalDate parsed = LocalDate.parse(d, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                return parsed.toString();
+            } catch (DateTimeParseException ignored) {
+                return d;
             }
         }
+        return d;
+    }
 
-        boolean tipoCompativel = true;
-        if (nomeTemplate.contains("nota") && !(tipoDetectado.contains("NOTA") || tipoDetectado.contains("NFE") || tipoDetectado.contains("NFSE"))) {
-            tipoCompativel = false;
-        } else if (nomeTemplate.contains("extrato") && !tipoDetectado.contains("EXTRATO")) {
-            tipoCompativel = false;
-        } else if ((nomeTemplate.contains("holerite") || nomeTemplate.contains("folha")) && !tipoDetectado.contains("FOLHA")) {
-            tipoCompativel = false;
-        }
-
-        if (!tipoCompativel) {
-            return "Tipo detectado não combina com o template da pendência. Revisar.";
-        }
-
-        boolean temTemplate = templateDocumentoRepository
-                .findByEmpresaIdOrderByNomeAsc(pendencia.getEmpresa().getId())
-                .stream()
-                .anyMatch(t -> t.getId().equals(pendencia.getTemplateDocumento().getId()));
-        if (!temTemplate) {
-            return "Template não encontrado para esta empresa. Revisar.";
-        }
-
+    private String inferirTributo(String textoBase) {
+        String base = textoBase == null ? "" : textoBase.toUpperCase(Locale.ROOT);
+        if (base.contains("ISS")) return "ISS";
+        if (base.contains("ICMS")) return "ICMS";
+        if (base.contains("PIS")) return "PIS";
+        if (base.contains("COFINS")) return "COFINS";
+        if (base.contains("IRPJ")) return "IRPJ";
+        if (base.contains("CSLL")) return "CSLL";
+        if (base.contains("FGTS")) return "FGTS";
+        if (base.contains("INSS")) return "INSS";
         return "";
     }
 
+    private void aplicarValidacoesContabeis(
+            DocumentoProcessamento processamento,
+            String tipoDocumento,
+            Map<String, String> campos,
+            List<String> motivosRevisao
+    ) {
+        PendenciaDocumento pendencia = processamento.getEntrega().getPendencia();
+        String competenciaEsperada = String.format("%04d-%02d", pendencia.getCompetencia().getAno(), pendencia.getCompetencia().getMes());
+        String competenciaExtraida = campos.getOrDefault("competencia", "");
+        if (!competenciaExtraida.isBlank() && !competenciaEsperada.equals(competenciaExtraida)) {
+            motivosRevisao.add("Competencia do documento difere da pendencia (" + competenciaExtraida + " x " + competenciaEsperada + ").");
+        }
+
+        // Vencimento costuma ser confiavel para guias de recolhimento, mas nao para notas.
+        if ("GUIA_IMPOSTO".equals(tipoDocumento)) {
+            String vencimentoExtraido = campos.getOrDefault("vencimento", "");
+            if (!vencimentoExtraido.isBlank()) {
+                String vencimentoPendencia = pendencia.getVencimento().toString();
+                if (!vencimentoPendencia.equals(vencimentoExtraido)) {
+                    motivosRevisao.add("Vencimento do documento difere da pendencia (" + vencimentoExtraido + " x " + vencimentoPendencia + ").");
+                }
+            }
+        }
+
+        if ("GUIA_IMPOSTO".equals(tipoDocumento) && campos.getOrDefault("tributo", "").isBlank()) {
+            motivosRevisao.add("Tributo nao identificado na guia de recolhimento.");
+        }
+    }
     private String extrairTextoImagemComTesseract(Path path) throws IOException, InterruptedException {
         Path outputBase = Files.createTempFile("ocr-", "");
         try {
@@ -389,4 +515,144 @@ public class DocumentoInteligenciaService {
         hist.setCriadoEm(LocalDateTime.now());
         revisaoDocumentoHistoricoRepository.save(hist);
     }
+
+    private void aplicarResultadoExtraido(
+            DocumentoProcessamento processamento,
+            String fonte,
+            String texto,
+            String tipo,
+            double confiancaBase
+    ) {
+        String cnpjPrestador = extrairCnpjPrestador(texto);
+        String cnpjTomador = extrairCnpjTomador(texto);
+        String cnpj = !cnpjPrestador.isBlank() ? cnpjPrestador : extrairCnpj(texto);
+        String valor = extrairValor(texto);
+        String competencia = extrairCompetencia(texto);
+        String vencimento = extrairData(texto);
+        String tributo = inferirTributo(texto);
+        double confianca = "DESCONHECIDO".equals(tipo) ? Math.min(confiancaBase, 0.45) : confiancaBase;
+        ProcessamentoStatus status = confianca >= 0.75 ? ProcessamentoStatus.PROCESSADO : ProcessamentoStatus.REJEITADO;
+        String observacao = status == ProcessamentoStatus.PROCESSADO
+                ? "Documento processado automaticamente."
+                : "Rejeitado automaticamente: baixa confiança na leitura automática.";
+        SeveridadeRevisao severidade = status == ProcessamentoStatus.PROCESSADO ? SeveridadeRevisao.BAIXA : SeveridadeRevisao.MEDIA;
+        List<String> motivosRevisao = new ArrayList<>();
+
+        String validacao = validarComPendencia(processamento, tipo, cnpj, cnpjTomador);
+        if (!validacao.isBlank()) {
+            status = ProcessamentoStatus.REJEITADO;
+            observacao = validacao;
+            confianca = Math.min(confianca, 0.7);
+            severidade = validacao.toLowerCase(Locale.ROOT).contains("cnpj")
+                    ? SeveridadeRevisao.ALTA
+                    : SeveridadeRevisao.MEDIA;
+            motivosRevisao.add(validacao);
+        }
+
+        List<String> camposObrigatorios = TipoDocumentoCatalogo.camposObrigatorios(tipo);
+        if (camposObrigatorios.contains("cnpj") && cnpj.isBlank()) {
+            status = ProcessamentoStatus.REJEITADO;
+            confianca = Math.min(confianca, 0.65);
+            motivosRevisao.add("CNPJ nao identificado no documento.");
+        }
+        if (camposObrigatorios.contains("valor") && valor.isBlank()) {
+            status = ProcessamentoStatus.REJEITADO;
+            confianca = Math.min(confianca, 0.68);
+            motivosRevisao.add("Valor principal nao identificado no documento.");
+        }
+
+        Map<String, String> campos = new LinkedHashMap<>();
+        campos.put("cnpj", safe(cnpj));
+        campos.put("cnpjPrestador", safe(cnpjPrestador));
+        campos.put("cnpjTomador", safe(cnpjTomador));
+        campos.put("valor", safe(valor));
+        campos.put("competencia", normalizarCompetencia(competencia));
+        campos.put("vencimento", normalizarData(vencimento));
+        campos.put("tributo", tributo);
+        aplicarValidacoesContabeis(processamento, tipo, campos, motivosRevisao);
+        if (!motivosRevisao.isEmpty()) {
+            status = ProcessamentoStatus.REJEITADO;
+            confianca = Math.min(confianca, 0.67);
+            observacao = motivosRevisao.get(0);
+        }
+
+        processamento.setTipoDocumento(tipo);
+        processamento.setConfianca(confianca);
+        processamento.setStatus(status);
+        processamento.setDadosExtraidosJson(montarDadosExtraidosJson(
+                fonte,
+                tipo,
+                campos,
+                confianca,
+                status == ProcessamentoStatus.PROCESSADO ? "SUCESSO" : "REJEITADO",
+                motivosRevisao
+        ));
+        processamento.setObservacaoProcessamento(observacao);
+        processamento.setSeveridade(severidade);
+        processamento.setAtualizadoEm(LocalDateTime.now());
+        finalizarProcessamentoAutomatico(processamento, "PROCESSAMENTO_TEXTO");
+    }
+
+    private String validarComPendencia(
+            DocumentoProcessamento processamento,
+            String tipoDetectado,
+            String cnpjPrincipal,
+            String cnpjSecundario
+    ) {
+        PendenciaDocumento pendencia = processamento.getEntrega().getPendencia();
+        String nomeTemplate = pendencia.getTemplateDocumento().getNome().toLowerCase(Locale.ROOT);
+        String cnpjEmpresa = pendencia.getEmpresa().getCnpj();
+
+        boolean tipoFiscal = tipoDetectado.contains("NOTA") || tipoDetectado.contains("NFE") || tipoDetectado.contains("NFSE");
+        if (tipoFiscal) {
+            if (!cnpjPrincipal.isBlank() || !cnpjSecundario.isBlank()) {
+                boolean cnpjCompativel = cnpjEmpresa.equals(cnpjPrincipal) || cnpjEmpresa.equals(cnpjSecundario);
+                if (!cnpjCompativel) {
+                    return "CNPJ do documento difere da empresa da pendência. Revisar.";
+                }
+            }
+        } else if (!cnpjPrincipal.isBlank() && !cnpjEmpresa.equals(cnpjPrincipal)) {
+            return "CNPJ do documento difere da empresa da pendência. Revisar.";
+        } else if (!cnpjSecundario.isBlank() && !cnpjEmpresa.equals(cnpjSecundario) && cnpjPrincipal.isBlank()) {
+            return "CNPJ do documento difere da empresa da pendência. Revisar.";
+        }
+
+        boolean tipoCompativel = true;
+        if (nomeTemplate.contains("nota") && !tipoFiscal) {
+            tipoCompativel = false;
+        } else if (nomeTemplate.contains("extrato") && !tipoDetectado.contains("EXTRATO")) {
+            tipoCompativel = false;
+        } else if ((nomeTemplate.contains("holerite") || nomeTemplate.contains("folha")) && !tipoDetectado.contains("FOLHA")) {
+            tipoCompativel = false;
+        }
+
+        if (!tipoCompativel) {
+            return "Tipo detectado não combina com o template da pendência. Revisar.";
+        }
+
+        boolean temTemplate = templateDocumentoRepository
+                .findByEmpresaIdOrderByNomeAsc(pendencia.getEmpresa().getId())
+                .stream()
+                .anyMatch(t -> t.getId().equals(pendencia.getTemplateDocumento().getId()));
+        if (!temTemplate) {
+            return "Template não encontrado para esta empresa. Revisar.";
+        }
+
+        return "";
+    }
+
+    private void finalizarProcessamentoAutomatico(DocumentoProcessamento processamento, String origem) {
+        PendenciaDocumento pendencia = processamento.getEntrega().getPendencia();
+        boolean aprovado = processamento.getStatus() == ProcessamentoStatus.PROCESSADO;
+        pendencia.setStatus(aprovado ? PendenciaStatus.VALIDADO : PendenciaStatus.REJEITADO);
+        pendenciaDocumentoRepository.save(pendencia);
+        DocumentoProcessamento salvo = documentoProcessamentoRepository.save(processamento);
+        String acao = aprovado ? "APROVADO_IA" : "REJEITADO_IA";
+        String motivo = processamento.getObservacaoProcessamento();
+        if (motivo == null || motivo.isBlank()) {
+            motivo = aprovado ? "Documento aprovado automaticamente pela IA." : "Documento rejeitado automaticamente pela IA.";
+        }
+        registrarHistorico(salvo, acao, "[" + origem + "] " + motivo, "IA");
+    }
+
 }

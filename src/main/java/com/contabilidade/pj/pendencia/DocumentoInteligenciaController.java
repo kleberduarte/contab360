@@ -2,13 +2,10 @@ package com.contabilidade.pj.pendencia;
 
 import com.contabilidade.pj.auth.AuthContext;
 import com.contabilidade.pj.auth.Usuario;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,30 +33,6 @@ public class DocumentoInteligenciaController {
                 .toList();
     }
 
-    @PostMapping("/{processamentoId}/aprovar")
-    public DocumentoProcessamentoResponse aprovarRevisao(@PathVariable Long processamentoId) {
-        Usuario usuario = AuthContext.get();
-        if (usuario == null) {
-            throw new IllegalArgumentException("Usuário não autenticado.");
-        }
-        DocumentoProcessamento atualizado = documentoInteligenciaService.marcarComoProcessado(processamentoId, usuario);
-        return DocumentoProcessamentoResponse.fromEntity(atualizado);
-    }
-
-    @PostMapping("/{processamentoId}/rejeitar")
-    public DocumentoProcessamentoResponse rejeitarRevisao(
-            @PathVariable Long processamentoId,
-            @Valid @org.springframework.web.bind.annotation.RequestBody RejeitarRevisaoRequest req
-    ) {
-        Usuario usuario = AuthContext.get();
-        if (usuario == null) {
-            throw new IllegalArgumentException("Usuário não autenticado.");
-        }
-        DocumentoProcessamento atualizado = documentoInteligenciaService
-                .marcarComoRejeitado(processamentoId, req.motivo(), usuario);
-        return DocumentoProcessamentoResponse.fromEntity(atualizado);
-    }
-
     @GetMapping("/{processamentoId}/historico")
     public List<HistoricoRevisaoResponse> historico(@PathVariable Long processamentoId) {
         Usuario usuario = AuthContext.get();
@@ -69,9 +42,6 @@ public class DocumentoInteligenciaController {
         return documentoInteligenciaService.listarHistorico(processamentoId, usuario).stream()
                 .map(HistoricoRevisaoResponse::fromEntity)
                 .toList();
-    }
-
-    public record RejeitarRevisaoRequest(@NotBlank String motivo) {
     }
 
     public record HistoricoRevisaoResponse(

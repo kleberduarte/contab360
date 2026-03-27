@@ -27,21 +27,13 @@
     const listaPendencias = document.getElementById("lista-pendencias");
     const pendenciasEmpty = document.getElementById("pendencias-empty");
 
-    const formStatus = document.getElementById("form-status");
-    const selectStatusPendencia = document.getElementById("status-pendencia");
-    const statusNovo = document.getElementById("status-novo");
-    const statusFeedback = document.getElementById("status-feedback");
+    const iaFeedback = document.getElementById("ia-feedback");
     const btnRecarregarIa = document.getElementById("btn-recarregar-ia");
     const listaIaRevisao = document.getElementById("lista-ia-revisao");
     const iaEmpty = document.getElementById("ia-empty");
-    const modalRejeicao = document.getElementById("modal-rejeicao");
-    const formRejeicaoModal = document.getElementById("form-rejeicao-modal");
-    const modalRejeicaoMotivo = document.getElementById("modal-rejeicao-motivo");
-    const btnCancelarRejeicao = document.getElementById("btn-cancelar-rejeicao");
     const modalHistorico = document.getElementById("modal-historico");
     const modalHistoricoContent = document.getElementById("modal-historico-content");
     const btnFecharHistorico = document.getElementById("btn-fechar-historico");
-    let processamentoRejeicaoAtual = null;
 
     const formFiltroCliente = document.getElementById("form-filtro-cliente");
     const listaPendenciasCliente = document.getElementById("lista-pendencias-cliente");
@@ -50,6 +42,20 @@
     const uploadForm = document.getElementById("form-upload");
     const uploadPendenciaEl = document.getElementById("upload-pendencia");
     const uploadFeedback = document.getElementById("upload-feedback");
+    const cnpjInput = document.getElementById("cnpj");
+
+    function somenteDigitos(value) {
+        return (value || "").replace(/\D/g, "");
+    }
+
+    function formatarCnpj(value) {
+        const digits = somenteDigitos(value).slice(0, 14);
+        if (digits.length <= 2) return digits;
+        if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+        if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+        if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+        return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+    }
 
     function headers(extra = {}) {
         const h = { ...extra };
@@ -121,18 +127,17 @@
         empresasEmpty.classList.add("hidden");
         empresas.forEach((e) => {
             const li = document.createElement("li");
-            li.textContent = `${e.cnpj} — ${e.razaoSocial}`;
+            li.textContent = `${formatarCnpj(e.cnpj)} — ${e.razaoSocial}`;
             listaEmpresas.appendChild(li);
             const op = document.createElement("option");
             op.value = e.id;
-            op.textContent = `${e.razaoSocial} (${e.cnpj})`;
+            op.textContent = `${e.razaoSocial} (${formatarCnpj(e.cnpj)})`;
             templateEmpresaEl.appendChild(op);
         });
     }
 
     function renderPendenciasContador(pendencias) {
         listaPendencias.innerHTML = "";
-        selectStatusPendencia.innerHTML = "";
         if (!pendencias.length) {
             pendenciasEmpty.classList.remove("hidden");
             return;
@@ -142,10 +147,6 @@
             const li = document.createElement("li");
             li.textContent = `#${p.id} ${p.empresaRazaoSocial} — ${p.templateDocumentoNome} — ${p.status} — vence ${p.vencimento}`;
             listaPendencias.appendChild(li);
-            const op = document.createElement("option");
-            op.value = p.id;
-            op.textContent = `#${p.id} ${p.templateDocumentoNome} (${p.empresaRazaoSocial})`;
-            selectStatusPendencia.appendChild(op);
         });
     }
 
@@ -159,8 +160,36 @@
         clienteEmpty.classList.add("hidden");
         pendencias.forEach((p) => {
             const li = document.createElement("li");
-            const observacao = p.observacaoAnalise ? ` — observacao: ${p.observacaoAnalise}` : "";
-            li.textContent = `#${p.id} ${p.templateDocumentoNome} — ${p.status} — vence ${p.vencimento}${observacao}`;
+            const header = document.createElement("div");
+            header.className = "pendencia-cliente-header";
+            header.textContent = `#${p.id} ${p.templateDocumentoNome} — vence ${p.vencimento}`;
+
+            const badge = document.createElement("span");
+            badge.className = "status-badge";
+            if (p.status === "VALIDADO") {
+                badge.classList.add("status-badge--ok");
+                badge.textContent = "OK pela IA";
+            } else if (p.status === "REJEITADO") {
+                badge.classList.add("status-badge--rejeitado");
+                badge.textContent = "Rejeitado pela IA";
+            } else if (p.status === "ENVIADO") {
+                badge.classList.add("status-badge--analise");
+                badge.textContent = "Em análise da IA";
+            } else {
+                badge.classList.add("status-badge--pendente");
+                badge.textContent = "Pendente de envio";
+            }
+
+            header.appendChild(document.createTextNode(" "));
+            header.appendChild(badge);
+            li.appendChild(header);
+
+            if (p.observacaoAnalise) {
+                const motivo = document.createElement("div");
+                motivo.className = "muted pendencia-cliente-motivo";
+                motivo.textContent = `Motivo: ${p.observacaoAnalise}`;
+                li.appendChild(motivo);
+            }
             listaPendenciasCliente.appendChild(li);
             const op = document.createElement("option");
             op.value = p.id;
@@ -183,32 +212,6 @@
             const motivo = item.observacaoProcessamento || "Sem detalhe.";
             const jsonPretty = formatJson(item.dadosExtraidosJson);
             li.innerHTML = `#${item.id} - ${item.nomeArquivoOriginal} - ${item.tipoDocumento} - conf. ${confianca} - ${item.status} <span class="severity severity--${sevClass}">${item.severidade}</span><br><span class="muted">${motivo}</span><pre class="ia-json">${jsonPretty}</pre>`;
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "btn btn--ghost";
-            btn.textContent = "Aprovar revisão";
-            btn.style.marginLeft = "8px";
-            btn.addEventListener("click", async () => {
-                try {
-                    await fetchJson(`/api/inteligencia/documentos/${item.id}/aprovar`, {
-                        method: "POST",
-                        headers: headers(),
-                    });
-                    await carregarFilaIa();
-                } catch (e) {
-                    setFeedback(statusFeedback, e.message || "Falha ao aprovar revisão IA.", "err");
-                }
-            });
-            li.appendChild(btn);
-
-            const rejectBtn = document.createElement("button");
-            rejectBtn.type = "button";
-            rejectBtn.className = "btn btn--ghost";
-            rejectBtn.textContent = "Rejeitar (com motivo)";
-            rejectBtn.style.marginLeft = "8px";
-            rejectBtn.addEventListener("click", () => abrirModalRejeicao(item.id));
-            li.appendChild(rejectBtn);
-
             const histBtn = document.createElement("button");
             histBtn.type = "button";
             histBtn.className = "btn btn--ghost";
@@ -218,18 +221,6 @@
             li.appendChild(histBtn);
             listaIaRevisao.appendChild(li);
         });
-    }
-
-    function abrirModalRejeicao(processamentoId) {
-        processamentoRejeicaoAtual = processamentoId;
-        formRejeicaoModal.reset();
-        modalRejeicao.classList.remove("hidden");
-        modalRejeicaoMotivo.focus();
-    }
-
-    function fecharModalRejeicao() {
-        processamentoRejeicaoAtual = null;
-        modalRejeicao.classList.add("hidden");
     }
 
     async function abrirModalHistorico(processamentoId) {
@@ -286,7 +277,7 @@
     }
 
     async function carregarFilaIa() {
-        const itens = await fetchJson("/api/inteligencia/documentos?somenteRevisar=true", { headers: headers() });
+        const itens = await fetchJson("/api/inteligencia/documentos", { headers: headers() });
         renderIaRevisao(itens);
     }
 
@@ -337,6 +328,10 @@
         setViewByPerfil();
     });
 
+    cnpjInput.addEventListener("input", () => {
+        cnpjInput.value = formatarCnpj(cnpjInput.value);
+    });
+
     empresaForm.addEventListener("submit", async (ev) => {
         ev.preventDefault();
         setFeedback(empresaFeedback, "", null);
@@ -345,7 +340,7 @@
                 method: "POST",
                 headers: headers({ "Content-Type": "application/json" }),
                 body: JSON.stringify({
-                    cnpj: document.getElementById("cnpj").value.trim(),
+                    cnpj: somenteDigitos(document.getElementById("cnpj").value),
                     razaoSocial: document.getElementById("razaoSocial").value.trim(),
                 }),
             });
@@ -397,53 +392,16 @@
         }
     });
 
-    formStatus.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-        setFeedback(statusFeedback, "", null);
-        try {
-            await fetchJson(`/api/pendencias/${selectStatusPendencia.value}/status`, {
-                method: "POST",
-                headers: headers({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ status: statusNovo.value }),
-            });
-            setFeedback(statusFeedback, "Status atualizado.", "ok");
-            await carregarPendenciasContador();
-        } catch (e) {
-            setFeedback(statusFeedback, e.message || "Erro ao atualizar status.", "err");
-        }
-    });
-
     btnRecarregarIa.addEventListener("click", async () => {
+        setFeedback(iaFeedback, "", null);
         try {
             await carregarFilaIa();
         } catch (e) {
-            setFeedback(statusFeedback, e.message || "Erro ao carregar fila IA.", "err");
+            setFeedback(iaFeedback, e.message || "Erro ao carregar análises IA.", "err");
         }
     });
 
-    formRejeicaoModal.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-        if (!processamentoRejeicaoAtual) return;
-        const motivoRejeicao = modalRejeicaoMotivo.value.trim();
-        if (!motivoRejeicao) return;
-        try {
-            await fetchJson(`/api/inteligencia/documentos/${processamentoRejeicaoAtual}/rejeitar`, {
-                method: "POST",
-                headers: headers({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ motivo: motivoRejeicao }),
-            });
-            fecharModalRejeicao();
-            await carregarFilaIa();
-        } catch (e) {
-            setFeedback(statusFeedback, e.message || "Falha ao rejeitar revisão IA.", "err");
-        }
-    });
-
-    btnCancelarRejeicao.addEventListener("click", fecharModalRejeicao);
     btnFecharHistorico.addEventListener("click", fecharModalHistorico);
-    modalRejeicao.addEventListener("click", (ev) => {
-        if (ev.target === modalRejeicao) fecharModalRejeicao();
-    });
     modalHistorico.addEventListener("click", (ev) => {
         if (ev.target === modalHistorico) fecharModalHistorico();
     });

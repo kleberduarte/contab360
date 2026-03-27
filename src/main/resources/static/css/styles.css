@@ -82,6 +82,24 @@ body {
     margin: 0;
 }
 
+.status-atual {
+    margin-top: 0.55rem;
+    font-weight: 600;
+}
+
+.status-atual--pendente,
+.status-atual--enviado {
+    color: #ffd56a;
+}
+
+.status-atual--validado {
+    color: #6ecf8c;
+}
+
+.status-atual--rejeitado {
+    color: #ff8a8a;
+}
+
 .hidden {
     display: none !important;
 }
@@ -306,4 +324,44 @@ code {
     border-radius: 10px;
     padding: 0.55rem 0.7rem;
     background: rgba(10, 18, 32, 0.55);
+}
+
+.pendencia-cliente-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.pendencia-cliente-motivo {
+    margin-top: 0.2rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    border: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.status-badge--ok {
+    color: #6ecf8c;
+    border-color: #2f7f4a;
+}
+
+.status-badge--rejeitado {
+    color: #ff8a8a;
+    border-color: #9a2a2a;
+}
+
+.status-badge--analise {
+    color: #ffd56a;
+    border-color: #8a6d1e;
+}
+
+.status-badge--pendente {
+    color: #95a7c0;
+    border-color: #445a7f;
 }
