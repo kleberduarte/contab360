@@ -3,6 +3,7 @@ package com.contabilidade.pj.auth;
 import com.contabilidade.pj.empresa.Empresa;
 import com.contabilidade.pj.empresa.EmpresaRepository;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,12 +28,19 @@ public class AuthSeedConfig {
             }
 
             List<Empresa> empresas = empresaRepository.findAll();
-            if (!empresas.isEmpty() && usuarioRepository.findByEmail("cliente@demo.com").isEmpty()) {
+            Optional<Usuario> clienteExistente = usuarioRepository.findByEmail("cliente@demo.com");
+            if (clienteExistente.isEmpty()) {
                 Usuario cliente = new Usuario();
                 cliente.setNome("Cliente Demo");
                 cliente.setEmail("cliente@demo.com");
                 cliente.setSenhaHash(authService.passwordEncoder().encode("123456"));
                 cliente.setPerfil(PerfilUsuario.CLIENTE);
+                if (!empresas.isEmpty()) {
+                    cliente.setEmpresa(empresas.get(0));
+                }
+                usuarioRepository.save(cliente);
+            } else if (!empresas.isEmpty() && clienteExistente.get().getEmpresa() == null) {
+                Usuario cliente = clienteExistente.get();
                 cliente.setEmpresa(empresas.get(0));
                 usuarioRepository.save(cliente);
             }

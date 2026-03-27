@@ -24,9 +24,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 public class PendenciaDocumentoController {
 
     private final PendenciaDocumentoService pendenciaDocumentoService;
+    private final DocumentoProcessamentoRepository documentoProcessamentoRepository;
 
-    public PendenciaDocumentoController(PendenciaDocumentoService pendenciaDocumentoService) {
+    public PendenciaDocumentoController(
+            PendenciaDocumentoService pendenciaDocumentoService,
+            DocumentoProcessamentoRepository documentoProcessamentoRepository
+    ) {
         this.pendenciaDocumentoService = pendenciaDocumentoService;
+        this.documentoProcessamentoRepository = documentoProcessamentoRepository;
     }
 
     @GetMapping
@@ -41,7 +46,7 @@ public class PendenciaDocumentoController {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
         return pendenciaDocumentoService.listar(ano, mes, empresaId, status, usuario).stream()
-                .map(PendenciaResponse::fromEntity)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -65,7 +70,15 @@ public class PendenciaDocumentoController {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
         PendenciaDocumento atualizada = pendenciaDocumentoService.atualizarStatus(pendenciaId, req.status(), usuario);
-        return PendenciaResponse.fromEntity(atualizada);
+        return toResponse(atualizada);
+    }
+
+    private PendenciaResponse toResponse(PendenciaDocumento pendencia) {
+        String observacaoAnalise = documentoProcessamentoRepository
+                .findTopByEntregaPendenciaIdOrderByAtualizadoEmDesc(pendencia.getId())
+                .map(DocumentoProcessamento::getObservacaoProcessamento)
+                .orElse(null);
+        return PendenciaResponse.fromEntity(pendencia, observacaoAnalise);
     }
 
     public record GerarPendenciasRequest(
@@ -88,9 +101,10 @@ public class PendenciaDocumentoController {
             Integer competenciaAno,
             Integer competenciaMes,
             String status,
-            LocalDate vencimento
+            LocalDate vencimento,
+            String observacaoAnalise
     ) {
-        public static PendenciaResponse fromEntity(PendenciaDocumento pendencia) {
+        public static PendenciaResponse fromEntity(PendenciaDocumento pendencia, String observacaoAnalise) {
             return new PendenciaResponse(
                     pendencia.getId(),
                     pendencia.getEmpresa().getId(),
@@ -101,7 +115,8 @@ public class PendenciaDocumentoController {
                     pendencia.getCompetencia().getAno(),
                     pendencia.getCompetencia().getMes(),
                     pendencia.getStatus().name(),
-                    pendencia.getVencimento()
+                    pendencia.getVencimento(),
+                    observacaoAnalise
             );
         }
     }

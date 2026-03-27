@@ -159,7 +159,8 @@
         clienteEmpty.classList.add("hidden");
         pendencias.forEach((p) => {
             const li = document.createElement("li");
-            li.textContent = `#${p.id} ${p.templateDocumentoNome} — ${p.status} — vence ${p.vencimento}`;
+            const observacao = p.observacaoAnalise ? ` — observacao: ${p.observacaoAnalise}` : "";
+            li.textContent = `#${p.id} ${p.templateDocumentoNome} — ${p.status} — vence ${p.vencimento}${observacao}`;
             listaPendenciasCliente.appendChild(li);
             const op = document.createElement("option");
             op.value = p.id;

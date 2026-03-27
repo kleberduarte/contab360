@@ -45,7 +45,7 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public Usuario validarToken(String token) {
-        SessaoAcesso sessao = sessaoAcessoRepository.findByToken(token)
+        SessaoAcesso sessao = sessaoAcessoRepository.findByTokenComUsuario(token)
                 .orElseThrow(() -> new IllegalArgumentException("Sessão inválida."));
         if (sessao.getExpiraEm().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Sessão expirada.");
