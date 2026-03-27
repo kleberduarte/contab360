@@ -1,5 +1,7 @@
 package com.contabilidade.pj.empresa;
 
+import com.contabilidade.pj.auth.AuthContext;
+import com.contabilidade.pj.auth.Usuario;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -24,12 +26,20 @@ public class EmpresaController {
 
     @GetMapping
     public List<Empresa> listar() {
-        return empresaService.listar();
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        return empresaService.listar(usuario);
     }
 
     @PostMapping
     public ResponseEntity<Empresa> criar(@Valid @RequestBody Empresa empresa) {
-        Empresa salva = empresaService.criar(empresa);
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        Empresa salva = empresaService.criar(empresa, usuario);
         return ResponseEntity.status(HttpStatus.CREATED).body(salva);
     }
 }

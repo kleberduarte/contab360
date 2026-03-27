@@ -1,0 +1,25 @@
+NOTA FISCAL DE SERVICO ELETRONICA (FICTICIA - TESTE)
+
+Numero: 000123
+Serie: 1
+Data de emissao: 26/03/2026
+
+Prestador:
+- Razao social: Solucoes Contabeis Beta Teste LTDA
+- CNPJ: 11.222.333/0001-81
+
+Tomador:
+- Razao social: Cliente Exemplo Comercio LTDA
+- CNPJ: 45.678.912/0001-10
+
+Descricao do servico:
+Servicos contabeis mensais - competencia 03/2026
+
+Valores:
+- Valor bruto: R$ 1.250,00
+- ISS (5%): R$ 62,50
+- Valor liquido: R$ 1.187,50
+
+Observacao:
+Documento ficticio para testes internos do sistema.
+Sem validade fiscal.

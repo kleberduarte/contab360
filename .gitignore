@@ -8,3 +8,9 @@
 .classpath
 .settings/
 *.log
+
+# Credenciais locais (copie mysql-local.env.example)
+mysql-local.env
+
+# Arquivos enviados em runtime
+uploads/

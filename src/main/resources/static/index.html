@@ -3,45 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema Contabilidade PJ</title>
+    <title>Contab360</title>
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
     <header class="header">
         <div class="header__inner">
-            <h1 class="header__title">Contabilidade PJ</h1>
-            <p class="header__subtitle">Centralize financeiro, fiscal e societário para seus clientes.</p>
+            <div>
+                <h1 class="header__title">Contab360</h1>
+                <p class="header__subtitle">Cobrança de documentos, pendências e entregas em um só lugar.</p>
+            </div>
+            <div id="session-info" class="hidden">
+                <p id="session-user" class="muted"></p>
+                <button id="btn-logout" class="btn btn--ghost">Sair</button>
+            </div>
         </div>
     </header>
 
     <main class="main">
-        <section class="card" aria-labelledby="status-title">
-            <h2 id="status-title">Status da API</h2>
-            <p id="health-status" class="muted">Verificando…</p>
-        </section>
-
-        <section class="card" aria-labelledby="empresas-title">
-            <h2 id="empresas-title">Empresas cadastradas</h2>
-            <ul id="lista-empresas" class="lista"></ul>
-            <p id="empresas-empty" class="muted hidden">Nenhuma empresa ainda.</p>
-        </section>
-
-        <section class="card" aria-labelledby="nova-title">
-            <h2 id="nova-title">Nova empresa (teste)</h2>
-            <form id="form-empresa" class="form">
+        <section id="login-card" class="card auth-card">
+            <h2>Acessar sistema</h2>
+            <p class="muted">Usuários demo: <code>contador@demo.com</code> / <code>123456</code> e <code>cliente@demo.com</code> / <code>123456</code></p>
+            <form id="form-login" class="form">
                 <label>
-                    CNPJ (14 dígitos, só números)
-                    <input type="text" name="cnpj" id="cnpj" maxlength="14" pattern="\d{14}" required placeholder="00000000000000">
+                    E-mail
+                    <input type="email" id="login-email" required placeholder="seu-email@empresa.com">
                 </label>
                 <label>
-                    Razão social
-                    <input type="text" name="razaoSocial" id="razaoSocial" required placeholder="Nome da empresa LTDA">
+                    Senha
+                    <input type="password" id="login-senha" required placeholder="******">
                 </label>
-                <button type="submit" class="btn">Cadastrar</button>
+                <button type="submit" class="btn">Entrar</button>
             </form>
-            <p id="form-feedback" class="feedback" role="status"></p>
+            <p id="login-feedback" class="feedback" role="status"></p>
+        </section>
+
+        <section id="contador-view" class="hidden">
+            <section class="card">
+                <h2>Painel do contador</h2>
+                <p id="health-status" class="muted">Verificando API...</p>
+            </section>
+
+            <section class="card">
+                <h2>Empresas cadastradas</h2>
+                <ul id="lista-empresas" class="lista"></ul>
+                <p id="empresas-empty" class="muted hidden">Nenhuma empresa ainda.</p>
+            </section>
+
+            <section class="card">
+                <h2>Nova empresa</h2>
+                <form id="form-empresa" class="form">
+                    <label>CNPJ (14 dígitos)<input type="text" id="cnpj" maxlength="14" pattern="\d{14}" required></label>
+                    <label>Razão social<input type="text" id="razaoSocial" required></label>
+                    <button type="submit" class="btn">Cadastrar</button>
+                </form>
+                <p id="form-feedback" class="feedback"></p>
+            </section>
+
+            <section class="card">
+                <h2>Template de documentos</h2>
+                <form id="form-template" class="form">
+                    <label>Empresa<select id="template-empresa" required></select></label>
+                    <label>Documento<input type="text" id="template-nome" required placeholder="Ex: Nota fiscal"></label>
+                    <label class="checkbox"><input type="checkbox" id="template-obrigatorio" checked> Obrigatório</label>
+                    <button type="submit" class="btn">Adicionar template</button>
+                </form>
+                <p id="template-feedback" class="feedback"></p>
+            </section>
+
+            <section class="card">
+                <h2>Pendências mensais</h2>
+                <form id="form-gerar-pendencias" class="form form--inline">
+                    <label>Ano<input type="number" id="pend-ano" min="2000" max="2100" required></label>
+                    <label>Mês<input type="number" id="pend-mes" min="1" max="12" required></label>
+                    <label>Vencimento<input type="number" id="pend-dia" min="1" max="31" value="10" required></label>
+                    <button type="submit" class="btn">Gerar pendências</button>
+                </form>
+                <p id="pendencias-feedback" class="feedback"></p>
+                <ul id="lista-pendencias" class="lista"></ul>
+                <p id="pendencias-empty" class="muted hidden">Nenhuma pendência para a competência.</p>
+            </section>
+
+            <section class="card">
+                <h2>Aprovação do contador</h2>
+                <form id="form-status" class="form form--inline">
+                    <label>Pendência<select id="status-pendencia" required></select></label>
+                    <label>Status
+                        <select id="status-novo" required>
+                            <option value="VALIDADO">VALIDADO</option>
+                            <option value="REJEITADO">REJEITADO</option>
+                        </select>
+                    </label>
+                    <button type="submit" class="btn">Atualizar status</button>
+                </form>
+                <p id="status-feedback" class="feedback"></p>
+            </section>
+
+            <section class="card">
+                <h2>Revisão de documentos (IA)</h2>
+                <div class="form form--inline">
+                    <button id="btn-recarregar-ia" type="button" class="btn btn--ghost">Atualizar fila IA</button>
+                </div>
+                <ul id="lista-ia-revisao" class="lista"></ul>
+                <p id="ia-empty" class="muted hidden">Nenhum documento pendente de revisão.</p>
+            </section>
+        </section>
+
+        <section id="cliente-view" class="hidden">
+            <section class="card">
+                <h2>Portal do cliente</h2>
+                <p class="muted">Envie seus documentos mensais e acompanhe o status de cada item.</p>
+            </section>
+            <section class="card">
+                <h2>Minhas pendências</h2>
+                <form id="form-filtro-cliente" class="form form--inline">
+                    <label>Ano<input type="number" id="cliente-ano" min="2000" max="2100" required></label>
+                    <label>Mês<input type="number" id="cliente-mes" min="1" max="12" required></label>
+                    <button type="submit" class="btn">Atualizar lista</button>
+                </form>
+                <ul id="lista-pendencias-cliente" class="lista"></ul>
+                <p id="cliente-empty" class="muted hidden">Nenhuma pendência encontrada.</p>
+            </section>
+            <section class="card">
+                <h2>Enviar documento</h2>
+                <form id="form-upload" class="form">
+                    <label>Pendência<select id="upload-pendencia" required></select></label>
+                    <label>Arquivo<input type="file" id="upload-arquivo" required></label>
+                    <label>Observação<input type="text" id="upload-observacao" placeholder="Opcional"></label>
+                    <button type="submit" class="btn">Enviar documento</button>
+                </form>
+                <p id="upload-feedback" class="feedback"></p>
+            </section>
         </section>
     </main>
+
+    <div id="modal-rejeicao" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-rejeicao-title">
+        <div class="modal">
+            <h3 id="modal-rejeicao-title">Rejeitar revisão IA</h3>
+            <p class="muted">Informe o motivo da rejeição para histórico e auditoria.</p>
+            <form id="form-rejeicao-modal" class="form">
+                <label>
+                    Motivo
+                    <textarea id="modal-rejeicao-motivo" rows="4" required placeholder="Ex: CNPJ divergente da empresa."></textarea>
+                </label>
+                <div class="modal-actions">
+                    <button type="button" id="btn-cancelar-rejeicao" class="btn btn--ghost">Cancelar</button>
+                    <button type="submit" class="btn">Confirmar rejeição</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-historico" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-historico-title">
+        <div class="modal modal--wide">
+            <h3 id="modal-historico-title">Histórico da revisão</h3>
+            <div id="modal-historico-content" class="timeline"></div>
+            <div class="modal-actions">
+                <button type="button" id="btn-fechar-historico" class="btn btn--ghost">Fechar</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/js/app.js"></script>
 </body>

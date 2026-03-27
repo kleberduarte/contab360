@@ -12,6 +12,6 @@ public class HealthController {
 
     @GetMapping("/health")
     public Map<String, String> health() {
-        return Map.of("status", "ok", "app", "sistema-contabilidade-pj");
+        return Map.of("status", "ok", "app", "contab360");
     }
 }
