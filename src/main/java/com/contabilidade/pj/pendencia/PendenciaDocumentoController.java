@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,8 +46,10 @@ public class PendenciaDocumentoController {
         if (usuario == null) {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
-        return pendenciaDocumentoService.listar(ano, mes, empresaId, status, usuario).stream()
-                .map(this::toResponse)
+        List<PendenciaDocumento> pendencias = pendenciaDocumentoService.listar(ano, mes, empresaId, status, usuario);
+        Map<Long, String> observacoes = mapearObservacoes(pendencias);
+        return pendencias.stream()
+                .map(p -> PendenciaResponse.fromEntity(p, observacoes.get(p.getId())))
                 .toList();
     }
 
@@ -70,15 +73,21 @@ public class PendenciaDocumentoController {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
         PendenciaDocumento atualizada = pendenciaDocumentoService.atualizarStatus(pendenciaId, req.status(), usuario);
-        return toResponse(atualizada);
+        Map<Long, String> observacoes = mapearObservacoes(List.of(atualizada));
+        return PendenciaResponse.fromEntity(atualizada, observacoes.get(atualizada.getId()));
     }
 
-    private PendenciaResponse toResponse(PendenciaDocumento pendencia) {
-        String observacaoAnalise = documentoProcessamentoRepository
-                .findTopByEntregaPendenciaIdOrderByAtualizadoEmDesc(pendencia.getId())
-                .map(DocumentoProcessamento::getObservacaoProcessamento)
-                .orElse(null);
-        return PendenciaResponse.fromEntity(pendencia, observacaoAnalise);
+    private Map<Long, String> mapearObservacoes(List<PendenciaDocumento> pendencias) {
+        if (pendencias.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> pendenciaIds = pendencias.stream().map(PendenciaDocumento::getId).toList();
+        return documentoProcessamentoRepository.findUltimasObservacoesByPendenciaIds(pendenciaIds).stream()
+                .collect(Collectors.toMap(
+                        DocumentoProcessamentoRepository.ObservacaoPendenciaView::getPendenciaId,
+                        DocumentoProcessamentoRepository.ObservacaoPendenciaView::getObservacaoProcessamento,
+                        (valorAtual, ignorar) -> valorAtual
+                ));
     }
 
     public record GerarPendenciasRequest(
