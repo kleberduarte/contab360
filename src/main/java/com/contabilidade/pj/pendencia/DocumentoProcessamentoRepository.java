@@ -25,6 +25,41 @@ public interface DocumentoProcessamentoRepository extends JpaRepository<Document
     List<DocumentoProcessamento> findByStatusOrderByAtualizadoEmDesc(ProcessamentoStatus status);
     List<DocumentoProcessamento> findAllByOrderByAtualizadoEmDesc();
 
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.empresa.id = :empresaId
+              and dp.status = :status
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByEmpresaIdAndStatus(
+            @Param("empresaId") Long empresaId,
+            @Param("status") ProcessamentoStatus status
+    );
+
+    /**
+     * Mesma árvore que {@link #findByEmpresaIdAndStatus}, mas exclui documentos cuja competência mensal está arquivada.
+     * Filtro aplicado no SQL (evita inconsistência com stream em memória).
+     */
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.empresa.id = :empresaId
+              and dp.status = :status
+              and c.arquivada = false
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByEmpresaIdAndStatusExcluindoCompetenciaArquivada(
+            @Param("empresaId") Long empresaId,
+            @Param("status") ProcessamentoStatus status
+    );
+
     interface ObservacaoPendenciaView {
         Long getPendenciaId();
         String getObservacaoProcessamento();

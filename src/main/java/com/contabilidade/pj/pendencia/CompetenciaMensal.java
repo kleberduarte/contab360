@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -31,6 +32,12 @@ public class CompetenciaMensal {
     @Column(nullable = false)
     private Integer mes;
 
+    @Column(nullable = false)
+    private boolean arquivada = false;
+
+    @Column
+    private LocalDateTime arquivadaEm;
+
     public Long getId() {
         return id;
     }
@@ -49,5 +56,21 @@ public class CompetenciaMensal {
 
     public void setMes(Integer mes) {
         this.mes = mes;
+    }
+
+    public boolean isArquivada() {
+        return arquivada;
+    }
+
+    public void setArquivada(boolean arquivada) {
+        this.arquivada = arquivada;
+    }
+
+    public LocalDateTime getArquivadaEm() {
+        return arquivadaEm;
+    }
+
+    public void setArquivadaEm(LocalDateTime arquivadaEm) {
+        this.arquivadaEm = arquivadaEm;
     }
 }

@@ -2,65 +2,165 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="description" content="Cobrança de documentos, pendências e entregas em um só lugar.">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Contab360">
     <title>Contab360</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css?v=20260327pwa">
 </head>
 <body>
-    <header class="header">
+    <header id="app-header" class="header hidden">
         <div class="header__inner">
             <div>
                 <h1 class="header__title">Contab360</h1>
                 <p class="header__subtitle">Cobrança de documentos, pendências e entregas em um só lugar.</p>
             </div>
-            <div id="session-info" class="hidden">
-                <p id="session-user" class="muted"></p>
-                <button id="btn-logout" class="btn btn--ghost">Sair</button>
+            <div id="session-info" class="header-session hidden">
+                <div class="header-user-menu" data-user-menu>
+                    <button type="button" id="btn-user-menu" class="header-user-menu__trigger" aria-expanded="false" aria-haspopup="true" aria-controls="header-user-dropdown">
+                        <span class="header-user-menu__avatar" id="session-avatar-initials" aria-hidden="true">—</span>
+                        <span class="header-user-menu__chev" aria-hidden="true">
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                    </button>
+                    <div id="header-user-dropdown" class="header-user-menu__dropdown hidden" role="menu" aria-labelledby="btn-user-menu">
+                        <p class="header-user-menu__eyebrow">Perfil pessoal</p>
+                        <div class="header-user-menu__card">
+                            <span class="header-user-menu__avatar header-user-menu__avatar--card" id="session-avatar-initials-card">—</span>
+                            <div class="header-user-menu__card-text">
+                                <span id="session-dropdown-name" class="header-user-menu__name">—</span>
+                                <span id="session-dropdown-meta" class="header-user-menu__meta">—</span>
+                            </div>
+                            <span class="header-user-menu__check" aria-hidden="true" title="Conta ativa">✓</span>
+                        </div>
+                        <button type="button" id="btn-minha-conta" class="header-user-menu__link" role="menuitem">Minha conta</button>
+                        <div class="header-user-menu__divider" role="separator"></div>
+                        <button type="button" id="btn-logout" class="header-user-menu__logout" role="menuitem">Sair</button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
-    <main class="main">
-        <section id="login-card" class="card auth-card">
-            <h2>Acessar sistema</h2>
-            <p class="muted">Usuários demo: <code>contador@demo.com</code> / <code>123456</code> e <code>cliente@demo.com</code> / <code>123456</code></p>
-            <form id="form-login" class="form">
-                <label>
-                    E-mail
-                    <input type="email" id="login-email" required placeholder="seu-email@empresa.com">
-                </label>
-                <label>
-                    Senha
-                    <input type="password" id="login-senha" required placeholder="******">
-                </label>
-                <button type="submit" class="btn">Entrar</button>
-            </form>
-            <p id="login-feedback" class="feedback" role="status"></p>
+    <main id="app-main" class="main">
+        <section id="login-card" class="login-screen">
+            <aside class="login-sidebar" aria-hidden="true">
+                <div class="login-sidebar__logo">Contab360</div>
+                <p class="login-sidebar__tagline">No Contab360 você pode</p>
+                <ul class="login-sidebar__list">
+                    <li>Centralizar pendências e documentos</li>
+                    <li>Acompanhar entregas e fiscal em um só lugar</li>
+                </ul>
+            </aside>
+            <div class="login-main">
+                <div class="login-panel__card">
+                    <h2 class="login-panel__title">Acessar o sistema</h2>
+                    <p class="login-panel__subtitle muted">Entre com seu e-mail e senha cadastrados.</p>
+                    <form id="form-login" class="form login-form">
+                        <label class="login-form__label">
+                            <span class="login-form__lbl">E-mail</span>
+                            <input type="email" id="login-email" required placeholder="seu-email@empresa.com" autocomplete="username">
+                        </label>
+                        <label class="login-form__label">
+                            <span class="login-form__lbl">Senha</span>
+                            <input type="password" id="login-senha" required placeholder="Digite sua senha" autocomplete="current-password">
+                        </label>
+                        <button type="submit" class="btn btn--login-primary">Entrar</button>
+                    </form>
+                    <p id="login-feedback" class="feedback login-feedback" role="status"></p>
+                </div>
+            </div>
         </section>
 
-        <section id="contador-view" class="hidden">
-            <section class="card">
-                <h2>Painel do contador</h2>
-                <p id="health-status" class="muted">Verificando API...</p>
+        <section id="app-shell" class="app-shell hidden">
+            <aside class="sidebar">
+                <h2 class="sidebar__title">Menu</h2>
+                <nav class="sidebar__nav">
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-contador-dashboard">Dashboard</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-empresas">Empresas</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-templates">Templates</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-pendencias">Pendências</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-ia">Revisão IA</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-documentos-validados-ia">Documentos validados (IA)</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-ia-observadora">IA Observadora</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-notas">Notas Fiscais</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-cadastros">CPF/CNPJ</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-cobrancas">Cobranças</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-certificados">Certificados</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-alertas">Alertas e Relatórios</button>
+
+                    <button type="button" class="sidebar__item" data-perfil="CLIENTE" data-target="screen-cliente-dashboard">Portal</button>
+                    <button type="button" class="sidebar__item" data-perfil="CLIENTE" data-target="screen-cliente-pendencias">Minhas pendências</button>
+                    <button type="button" class="sidebar__item" data-perfil="CLIENTE" data-target="screen-cliente-upload">Enviar documento</button>
+                    <button type="button" class="sidebar__item" data-perfil="CLIENTE" data-target="screen-documentos-validados-ia">Documentos validados (IA)</button>
+                </nav>
+            </aside>
+
+            <section class="content">
+            <section id="screen-contador-dashboard" class="card app-screen dashboard dashboard--page hidden">
+                <header class="dashboard-hero" aria-labelledby="dash-contador-title">
+                    <div class="dashboard-hero__inner">
+                        <p class="dashboard-hero__eyebrow">Contab360 · Contador</p>
+                        <h2 id="dash-contador-title" class="dashboard-hero__title">Painel do contador</h2>
+                        <p class="dashboard-hero__lead">
+                            Visão geral da operação, indicadores e atalhos do período.
+                            <span class="dashboard-hero__comp">
+                                <span class="dashboard-hero__comp-label">Competência</span>
+                                <span class="dashboard-badge" id="dashboard-contador-competencia">—</span>
+                            </span>
+                        </p>
+                    </div>
+                </header>
+                <div class="dashboard-body">
+                    <p id="dashboard-contador-feedback" class="feedback hidden" role="status"></p>
+                    <div id="dashboard-contador-donuts" class="dashboard-donuts-wrap" aria-label="Resumo visual 360°"></div>
+                    <div id="dashboard-contador-kpis" class="dashboard-kpis" aria-live="polite"></div>
+                    <div class="dashboard-panels dashboard-panels--cols">
+                        <div class="dashboard-panel">
+                            <h3 class="dashboard-h3">Notas fiscais</h3>
+                            <p id="dashboard-contador-radar" class="dashboard-radar muted">Carregando…</p>
+                        </div>
+                        <div class="dashboard-panel dashboard-panel--actions">
+                            <h3 class="dashboard-h3">Atalhos</h3>
+                            <div class="dashboard-actions">
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-pendencias">Pendências</button>
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-ia">Revisão IA</button>
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-empresas">Empresas</button>
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-fiscal-notas">Notas fiscais</button>
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-fiscal-alertas">Alertas e relatórios</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
-            <section class="card">
-                <h2>Empresas cadastradas</h2>
+            <section id="screen-empresas" class="card app-screen hidden">
+                <h2>Empresas cadastradas e novo cadastro</h2>
                 <ul id="lista-empresas" class="lista"></ul>
                 <p id="empresas-empty" class="muted hidden">Nenhuma empresa ainda.</p>
-            </section>
-
-            <section class="card">
-                <h2>Nova empresa</h2>
                 <form id="form-empresa" class="form">
                     <label>CNPJ (14 dígitos)<input type="text" id="cnpj" maxlength="18" inputmode="numeric" autocomplete="off" required></label>
                     <label>Razão social<input type="text" id="razaoSocial" required></label>
+                    <label>CPF responsável (11 dígitos)<input type="text" id="cpfResponsavel" maxlength="14" inputmode="numeric" autocomplete="off"></label>
+                    <label class="checkbox"><input type="checkbox" id="mei"> Empresa MEI</label>
+                    <label>Vencimento DAS (MEI)<input type="date" id="vencimentoDas"></label>
+                    <label>Vencimento certificado MEI<input type="date" id="vencimentoCertificadoMei"></label>
                     <button type="submit" class="btn">Cadastrar</button>
                 </form>
                 <p id="form-feedback" class="feedback"></p>
             </section>
 
-            <section class="card">
+            <section id="screen-templates" class="card app-screen hidden">
                 <h2>Template de documentos</h2>
                 <form id="form-template" class="form">
                     <label>Empresa<select id="template-empresa" required></select></label>
@@ -71,36 +171,212 @@
                 <p id="template-feedback" class="feedback"></p>
             </section>
 
-            <section class="card">
-                <h2>Pendências mensais</h2>
-                <form id="form-gerar-pendencias" class="form form--inline">
-                    <label>Ano<input type="number" id="pend-ano" min="2000" max="2100" required></label>
-                    <label>Mês<input type="number" id="pend-mes" min="1" max="12" required></label>
-                    <label>Vencimento<input type="number" id="pend-dia" min="1" max="31" value="10" required></label>
-                    <button type="submit" class="btn">Gerar pendências</button>
-                </form>
+            <section id="screen-pendencias" class="card app-screen pendencias-screen hidden">
+                <header class="pendencias-header">
+                    <h2>Pendências mensais</h2>
+                    <p class="pendencias-lead muted">Gere a competência, acompanhe por empresa e documento.</p>
+                </header>
+                <details class="pendencias-help">
+                    <summary class="pendencias-help__summary">Sobre arquivamento automático</summary>
+                    <p class="pendencias-help__body muted">Quando <strong>todas</strong> as pendências do mês estiverem <strong>validadas</strong>, a competência é <strong>arquivada</strong>: os dados permanecem no sistema e saem desta lista até você marcar “Incluir competências arquivadas”.</p>
+                </details>
+                <div class="pendencias-toolbar">
+                    <form id="form-gerar-pendencias" class="pendencias-form">
+                        <div class="pendencias-fields">
+                            <label class="pendencias-field">
+                                <span class="pendencias-field__lbl">Ano</span>
+                                <input type="number" id="pend-ano" class="pendencias-field__input" min="2000" max="2100" required>
+                            </label>
+                            <label class="pendencias-field">
+                                <span class="pendencias-field__lbl">Mês</span>
+                                <input type="number" id="pend-mes" class="pendencias-field__input" min="1" max="12" required>
+                            </label>
+                            <label class="pendencias-field">
+                                <span class="pendencias-field__lbl">Dia venc.</span>
+                                <input type="number" id="pend-dia" class="pendencias-field__input" min="1" max="31" value="10" required>
+                            </label>
+                        </div>
+                        <div class="pendencias-actions">
+                            <button type="submit" class="btn pendencias-btn-primary">Gerar pendências</button>
+                            <button type="button" id="btn-pendencias-atualizar" class="btn btn--ghost pendencias-btn-secondary">Atualizar lista</button>
+                        </div>
+                    </form>
+                    <label class="checkbox pend-arquivadas-check">
+                        <input type="checkbox" id="pend-mostrar-arquivadas"> Incluir competências arquivadas (histórico)
+                    </label>
+                </div>
+                <p id="pendencias-arquivo-banner" class="pend-arquivo-banner hidden" role="status"></p>
                 <p id="pendencias-feedback" class="feedback"></p>
-                <ul id="lista-pendencias" class="lista"></ul>
-                <p id="pendencias-empty" class="muted hidden">Nenhuma pendência para a competência.</p>
+                <div id="lista-pendencias" class="pendencias-grid" role="list"></div>
+                <p id="pendencias-empty" class="pendencias-empty muted hidden" role="status">Nenhuma pendência para a competência.</p>
             </section>
 
-            <section class="card">
-                <h2>Revisão de documentos (IA)</h2>
+            <section id="screen-ia-observadora" class="card app-screen hidden">
+                <h2>IA Observadora</h2>
+                <p class="muted">Monitora automaticamente as acoes no sistema (contador e cliente) e gera insights para evolucao futura da automacao.</p>
                 <div class="form form--inline">
+                    <button type="button" id="btn-atualizar-ia-obs" class="btn">Atualizar painel</button>
+                </div>
+                <p id="ia-obs-feedback" class="feedback"></p>
+                <div id="ia-obs-resumo" class="ia-obs-bloco"></div>
+                <div id="ia-obs-sugestoes" class="ia-obs-bloco"></div>
+                <h3 class="ia-obs-subtitulo">Ultimos eventos</h3>
+                <div id="ia-obs-eventos" class="ia-obs-eventos"></div>
+            </section>
+
+            <section id="screen-ia" class="card app-screen hidden">
+                <h2>Revisão de documentos (IA)</h2>
+                <p class="muted ia-revisao-lead">Por padrão não aparecem itens já validados ou de competências arquivadas.</p>
+                <div class="form form--inline ia-revisao-bar">
                     <button id="btn-recarregar-ia" type="button" class="btn btn--ghost">Atualizar análises IA</button>
+                    <label class="checkbox ia-revisao-check">
+                        <input type="checkbox" id="ia-incluir-concluidos"> Exibir concluídos (validados / mês arquivado)
+                    </label>
                 </div>
                 <p id="ia-feedback" class="feedback"></p>
                 <ul id="lista-ia-revisao" class="lista"></ul>
                 <p id="ia-empty" class="muted hidden">Nenhum documento analisado ainda.</p>
             </section>
-        </section>
 
-        <section id="cliente-view" class="hidden">
-            <section class="card">
-                <h2>Portal do cliente</h2>
-                <p class="muted">Envie seus documentos mensais e acompanhe o status de cada item.</p>
+            <section id="screen-fiscal-notas" class="card app-screen hidden">
+                <h2>Emissão de notas fiscais</h2>
+                <div class="form form--inline nfse-toolbar">
+                    <button type="button" id="btn-gerar-massa-pmsp-tela" class="btn btn--ghost">Gerar massa de teste PMSP na tela</button>
+                </div>
+                <form id="form-fiscal-nota" class="form">
+                    <label>Documento emitente<input type="text" id="nota-emitente" required></label>
+                    <label>Documento destinatário<input type="text" id="nota-destinatario" required></label>
+                    <label>Tipo do documento
+                        <select id="nota-tipo" required>
+                            <option value="NFE">NFe</option><option value="NFSE">NFSe</option><option value="NFCE">NFCe</option>
+                            <option value="CTE">CTe</option><option value="MDFE">MDFe</option><option value="CTE_OS">CTe OS</option>
+                        </select>
+                    </label>
+                    <label>Operação
+                        <select id="nota-operacao" required><option value="SAIDA">Saída</option><option value="ENTRADA">Entrada</option></select>
+                    </label>
+                    <label>Valor total<input type="number" id="nota-valor" min="0.01" step="0.01" required></label>
+                    <label>Data emissão<input type="date" id="nota-data" required></label>
+                    <label>Município<input type="text" id="nota-municipio" required></label>
+                    <label>UF<input type="text" id="nota-uf" maxlength="2" required></label>
+                    <details id="nfse-pmsp-details" class="nfse-pmsp-details muted">
+                        <summary>Campos extras da NFS-e (editáveis após gerar a massa)</summary>
+                        <div class="form">
+                            <label>Nº exibição<input type="text" id="nfse-numero-exibicao" maxlength="12" placeholder="00002701"></label>
+                            <label>Código verificação<input type="text" id="nfse-codigo-verificacao" maxlength="16" placeholder="HXBA-6GMC"></label>
+                            <label>Razão prestador<input type="text" id="nfse-razao-emitente" placeholder="INSCRICAO PARA TESTE NFE..."></label>
+                            <label>Razão tomador<input type="text" id="nfse-razao-tomador" placeholder="(igual ao cartão de teste)"></label>
+                            <label>End. prestador<input type="text" id="nfse-endereco-emitente"></label>
+                            <label>End. tomador<input type="text" id="nfse-endereco-tomador"></label>
+                            <label>IM prestador<input type="text" id="nfse-im-emitente" maxlength="24"></label>
+                            <label>IM tomador<input type="text" id="nfse-im-tomador" maxlength="24"></label>
+                            <label>Discriminação<textarea id="nfse-discriminacao" rows="2" placeholder="teste"></textarea></label>
+                            <label>E-mail tomador<input type="text" id="nfse-email-tomador" placeholder="-----"></label>
+                            <label>Código serviço (texto)<input type="text" id="nfse-codigo-servico"></label>
+                            <label>Valor deduções (R$)<input type="number" id="nfse-valor-deducoes" min="0" step="0.01"></label>
+                            <label>Alíquota ISS (%)<input type="number" id="nfse-aliquota-iss" min="0" max="100" step="0.01"></label>
+                            <label>Crédito abatimento IPTU (R$)<input type="number" id="nfse-credito-iptu" min="0" step="0.01" placeholder="0"></label>
+                            <label>Vencimento ISS<input type="date" id="nfse-data-vencimento-iss"></label>
+                            <button type="button" id="btn-preencher-massa-pmsp" class="btn btn--ghost">Preencher massa de teste PMSP</button>
+                        </div>
+                    </details>
+                    <button type="submit" class="btn">Emitir nota</button>
+                </form>
+                <p id="nota-feedback" class="feedback"></p>
+                <div id="nota-pos-emitir" class="nota-pos-emitir hidden" aria-live="polite"></div>
+                <button type="button" id="btn-radar-notas" class="btn btn--ghost">Atualizar radar</button>
+                <p id="radar-feedback" class="feedback"></p>
+                <pre id="radar-json" class="ia-json"></pre>
             </section>
-            <section class="card">
+
+            <section id="screen-fiscal-cadastros" class="card app-screen hidden">
+                <h2>Cadastro e gestão CPF/CNPJ</h2>
+                <form id="form-fiscal-cadastro" class="form">
+                    <label>Tipo
+                        <select id="cadastro-tipo" required><option value="CNPJ">CNPJ</option><option value="CPF">CPF</option></select>
+                    </label>
+                    <label>Documento<input type="text" id="cadastro-documento" required></label>
+                    <label>Nome/Razão social<input type="text" id="cadastro-nome" required></label>
+                    <button type="submit" class="btn">Salvar cadastro</button>
+                </form>
+                <p id="cadastro-feedback" class="feedback"></p>
+            </section>
+
+            <section id="screen-fiscal-cobrancas" class="card app-screen hidden">
+                <h2>Geração de cobranças</h2>
+                <form id="form-fiscal-cobranca" class="form">
+                    <label>Documento pagador<input type="text" id="cobranca-documento" required></label>
+                    <label>Valor<input type="number" id="cobranca-valor" min="0.01" step="0.01" required></label>
+                    <label>Meio de pagamento
+                        <select id="cobranca-meio" required>
+                            <option value="BOLETO">Boleto</option><option value="PIX">Pix</option><option value="CARTAO">Cartão</option><option value="DEBITO_AUTOMATICO">Débito automático</option>
+                        </select>
+                    </label>
+                    <label>Vencimento<input type="date" id="cobranca-vencimento" required></label>
+                    <label>Descrição<input type="text" id="cobranca-descricao" required></label>
+                    <button type="submit" class="btn">Gerar cobrança</button>
+                </form>
+                <p id="cobranca-feedback" class="feedback"></p>
+            </section>
+
+            <section id="screen-fiscal-certificados" class="card app-screen hidden">
+                <h2>Venda de certificado digital</h2>
+                <form id="form-fiscal-certificado" class="form">
+                    <label>Documento solicitante<input type="text" id="cert-doc" required></label>
+                    <label>Titular<input type="text" id="cert-titular" required></label>
+                    <label>Email contato<input type="email" id="cert-email" required></label>
+                    <label>Tipo certificado<input type="text" id="cert-tipo" placeholder="A1 ou A3" required></label>
+                    <label>Validade (meses)<input type="number" id="cert-validade" min="1" required></label>
+                    <button type="submit" class="btn">Registrar venda</button>
+                </form>
+                <p id="cert-feedback" class="feedback"></p>
+            </section>
+
+            <section id="screen-fiscal-alertas" class="card app-screen hidden">
+                <h2>Alertas automáticos e relatório estratégico</h2>
+                <div class="form form--inline">
+                    <button type="button" id="btn-gerar-alertas" class="btn">Gerar alertas automáticos</button>
+                    <button type="button" id="btn-relatorio-estrategico" class="btn btn--with-icon">
+                        <svg class="btn__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v7h-7"/></svg>
+                        Atualizar relatório
+                    </button>
+                    <button type="button" id="btn-prefeituras" class="btn btn--ghost">Ver compatibilidade prefeituras</button>
+                </div>
+                <p id="alerta-feedback" class="feedback"></p>
+                <pre id="relatorio-json" class="ia-json"></pre>
+            </section>
+
+            <section id="screen-cliente-dashboard" class="card app-screen dashboard dashboard--page hidden">
+                <header class="dashboard-hero dashboard-hero--cliente" aria-labelledby="dash-cliente-title">
+                    <div class="dashboard-hero__inner">
+                        <p class="dashboard-hero__eyebrow">Contab360 · Portal</p>
+                        <h2 id="dash-cliente-title" class="dashboard-hero__title">Portal do cliente</h2>
+                        <p class="dashboard-hero__lead">
+                            Acompanhe entregas e documentos da sua empresa.
+                            <span class="dashboard-hero__comp">
+                                <span class="dashboard-hero__comp-label">Competência</span>
+                                <span class="dashboard-badge" id="dashboard-cliente-competencia">—</span>
+                            </span>
+                        </p>
+                    </div>
+                </header>
+                <div class="dashboard-body">
+                    <p id="dashboard-cliente-feedback" class="feedback hidden" role="status"></p>
+                    <div id="dashboard-cliente-donuts" class="dashboard-donuts-wrap" aria-label="Resumo visual 360°"></div>
+                    <div id="dashboard-cliente-kpis" class="dashboard-kpis" aria-live="polite"></div>
+                    <div class="dashboard-panels">
+                        <div class="dashboard-panel dashboard-panel--actions dashboard-panel--full">
+                            <h3 class="dashboard-h3">Atalhos</h3>
+                            <div class="dashboard-actions">
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-cliente-pendencias">Minhas pendências</button>
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-cliente-upload">Enviar documento</button>
+                                <button type="button" class="btn btn--ghost dashboard-goto" data-target="screen-documentos-validados-ia">Documentos validados (IA)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section id="screen-cliente-pendencias" class="card app-screen hidden">
                 <h2>Minhas pendências</h2>
                 <form id="form-filtro-cliente" class="form form--inline">
                     <label>Ano<input type="number" id="cliente-ano" min="2000" max="2100" required></label>
@@ -110,7 +386,7 @@
                 <ul id="lista-pendencias-cliente" class="lista"></ul>
                 <p id="cliente-empty" class="muted hidden">Nenhuma pendência encontrada.</p>
             </section>
-            <section class="card">
+            <section id="screen-cliente-upload" class="card app-screen hidden">
                 <h2>Enviar documento</h2>
                 <form id="form-upload" class="form">
                     <label>Pendência<select id="upload-pendencia" required></select></label>
@@ -119,6 +395,58 @@
                     <button type="submit" class="btn">Enviar documento</button>
                 </form>
                 <p id="upload-feedback" class="feedback"></p>
+            </section>
+
+            <section id="screen-documentos-validados-ia" class="card app-screen card--docs-validados hidden">
+                <header class="docs-validados-header">
+                    <h2 class="docs-validados-title">Documentos validados pela IA</h2>
+                    <p class="muted docs-validados-lead">Dados extraídos por tipo — use as abas abaixo para alternar a categoria.</p>
+                    <details class="docs-validados-help">
+                        <summary class="docs-validados-help__summary">Mais informações</summary>
+                        <p class="docs-validados-help__body muted">Holerites com captura completa exibem proventos, descontos e bases em destaque. No perfil contador, escolha o CNPJ e marque <strong>competências arquivadas</strong> se quiser incluir meses já encerrados.</p>
+                    </details>
+                </header>
+
+                <div class="docs-validados-toolbar">
+                    <div class="docs-validados-toolbar__body">
+                        <div id="docs-validados-empresa-wrap" class="docs-validados-filters hidden">
+                            <label class="docs-validados-field">
+                                <span class="docs-validados-field__lbl">Empresa</span>
+                                <select id="docs-validados-empresa" aria-label="Filtrar por empresa"></select>
+                            </label>
+                            <label class="checkbox docs-validados-arq-check">
+                                <input type="checkbox" id="docs-validados-incluir-arquivadas"> Incluir competências arquivadas
+                            </label>
+                        </div>
+                        <p id="docs-validados-cliente-empresa" class="docs-validados-cliente-empresa muted hidden" role="status"></p>
+                    </div>
+                    <button type="button" id="btn-atualizar-docs-validados" class="btn docs-validados-toolbar__btn">Atualizar lista</button>
+                </div>
+
+                <details id="docs-validados-arq-details" class="docs-validados-arq-details muted hidden">
+                    <summary class="docs-validados-arq-details__summary">O que são competências arquivadas?</summary>
+                    <p id="docs-validados-arq-hint" class="docs-validados-arq-hint-inner">É o mês em que <strong>todas</strong> as pendências foram validadas (mesma regra da tela Pendências). Com a opção desmarcada, esses meses não aparecem aqui.</p>
+                </details>
+
+                <p id="docs-validados-feedback" class="feedback docs-validados-feedback"></p>
+                <div class="docs-validados-carousel-wrap">
+                    <div id="docs-validados-tabs" class="doc-tabs doc-tabs--scroll doc-tabs--carousel" role="tablist" aria-label="Tipos de documento"></div>
+                    <nav id="docs-validados-tabs-pager" class="doc-tabs-pager" aria-label="Navegação das categorias" hidden>
+                        <button type="button" class="doc-tabs-pager__btn" id="docs-validados-pager-prev" aria-label="Categoria anterior">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                        </button>
+                        <span class="doc-tabs-pager__indicator" aria-live="polite">
+                            <span id="docs-validados-pager-current" class="doc-tabs-pager__cur">1</span>
+                            <span class="doc-tabs-pager__sep">/</span>
+                            <span id="docs-validados-pager-total" class="doc-tabs-pager__tot">1</span>
+                        </span>
+                        <button type="button" class="doc-tabs-pager__btn" id="docs-validados-pager-next" aria-label="Próxima categoria">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                    </nav>
+                </div>
+                <div id="docs-validados-panels" class="doc-tab-panels"></div>
+            </section>
             </section>
         </section>
     </main>
@@ -133,6 +461,23 @@
         </div>
     </div>
 
-    <script src="/js/app.js"></script>
+    <div id="modal-dados-extraidos" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-dados-extraidos-title">
+        <div class="modal modal--wide">
+            <h3 id="modal-dados-extraidos-title">Dados extraídos do documento</h3>
+            <p id="modal-dados-extraidos-meta" class="muted"></p>
+            <div id="modal-dados-toolbar" class="form form--inline modal-toolbar-dados hidden">
+                <button type="button" id="btn-export-dados-csv" class="btn btn--ghost">Exportar CSV</button>
+                <button type="button" id="btn-export-dados-pdf" class="btn btn--ghost">Exportar PDF</button>
+                <button type="button" id="btn-salvar-dados-extraidos" class="btn hidden">Salvar alterações</button>
+            </div>
+            <p id="modal-dados-extraidos-feedback" class="feedback"></p>
+            <div id="modal-dados-extraidos-content" class="dados-extraidos-wrap"></div>
+            <div class="modal-actions">
+                <button type="button" id="btn-fechar-dados-extraidos" class="btn btn--ghost">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js?v=20260327header"></script>
 </body>
 </html>

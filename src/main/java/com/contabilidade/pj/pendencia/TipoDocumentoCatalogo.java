@@ -33,15 +33,23 @@ public final class TipoDocumentoCatalogo {
         if (base.contains("extrato")) {
             return "EXTRATO_BANCARIO";
         }
+        /* Folha / holerite antes de "recibo", pois contracheque traz "recibo de pagamento de salário". */
+        if (base.contains("holerite")
+                || base.contains("contra-cheque")
+                || base.contains("contra cheque")
+                || base.contains("folha de pagamento")
+                || base.contains("demonstrativo de pagamento")
+                || base.contains("pro-labore")
+                || base.contains("pro labore")
+                || base.contains("recibo de pagamento")) {
+            return "FOLHA_PAGAMENTO";
+        }
         if (base.contains("recibo") || base.contains("comprovante de despesa")) {
             return "RECIBO_DESPESA";
         }
         if (base.contains("iss") || base.contains("icms") || base.contains("pis")
                 || base.contains("cofins") || base.contains("irpj") || base.contains("csll")) {
             return "GUIA_IMPOSTO";
-        }
-        if (base.contains("holerite") || base.contains("folha") || base.contains("pro-labore")) {
-            return "FOLHA_PAGAMENTO";
         }
         if (base.contains("contrato social") || base.contains("alteracao societaria")) {
             return "CONTRATO_SOCIAL";

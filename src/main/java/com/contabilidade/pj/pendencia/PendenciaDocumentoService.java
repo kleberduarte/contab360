@@ -6,6 +6,7 @@ import com.contabilidade.pj.empresa.Empresa;
 import com.contabilidade.pj.empresa.EmpresaRepository;
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -18,17 +19,20 @@ public class PendenciaDocumentoService {
     private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
     private final TemplateDocumentoRepository templateDocumentoRepository;
     private final EmpresaRepository empresaRepository;
+    private final CompetenciaArquivamentoService competenciaArquivamentoService;
 
     public PendenciaDocumentoService(
             CompetenciaMensalRepository competenciaMensalRepository,
             PendenciaDocumentoRepository pendenciaDocumentoRepository,
             TemplateDocumentoRepository templateDocumentoRepository,
-            EmpresaRepository empresaRepository
+            EmpresaRepository empresaRepository,
+            CompetenciaArquivamentoService competenciaArquivamentoService
     ) {
         this.competenciaMensalRepository = competenciaMensalRepository;
         this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
         this.templateDocumentoRepository = templateDocumentoRepository;
         this.empresaRepository = empresaRepository;
+        this.competenciaArquivamentoService = competenciaArquivamentoService;
     }
 
     @Transactional
@@ -81,6 +85,9 @@ public class PendenciaDocumentoService {
                 totalCriadas++;
             }
         }
+        if (totalCriadas > 0) {
+            competenciaArquivamentoService.sincronizarArquivamentoCompetencia(competencia.getId());
+        }
         return totalCriadas;
     }
 
@@ -90,7 +97,8 @@ public class PendenciaDocumentoService {
             Integer mes,
             Long empresaId,
             PendenciaStatus status,
-            Usuario usuarioAtual
+            Usuario usuarioAtual,
+            boolean incluirArquivadas
     ) {
         if (ano == null || mes == null) {
             throw new IllegalArgumentException("Ano e mês são obrigatórios.");
@@ -102,6 +110,12 @@ public class PendenciaDocumentoService {
                 return List.of();
             }
             empresaFiltrada = usuarioAtual.getEmpresa().getId();
+        }
+
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR && !incluirArquivadas) {
+            if (competenciaMensalRepository.findByAnoAndMes(ano, mes).map(CompetenciaMensal::isArquivada).orElse(false)) {
+                return List.of();
+            }
         }
 
         List<PendenciaDocumento> pendencias = empresaFiltrada == null
@@ -138,7 +152,9 @@ public class PendenciaDocumentoService {
         PendenciaDocumento pendencia = pendenciaDocumentoRepository.findById(pendenciaId)
                 .orElseThrow(() -> new IllegalArgumentException("Pendência não encontrada."));
         pendencia.setStatus(novoStatus);
-        return pendenciaDocumentoRepository.save(pendencia);
+        PendenciaDocumento salva = pendenciaDocumentoRepository.save(pendencia);
+        competenciaArquivamentoService.sincronizarArquivamentoCompetencia(pendencia.getCompetencia().getId());
+        return salva;
     }
 
     private LocalDate calcularVencimento(Integer ano, Integer mes, Integer diaVencimento) {
@@ -149,5 +165,18 @@ public class PendenciaDocumentoService {
         } catch (DateTimeException ex) {
             throw new IllegalArgumentException("Competência inválida.");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public CompetenciaArquivoInfo obterInfoArquivoCompetencia(Integer ano, Integer mes, Usuario usuarioAtual) {
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
+            return new CompetenciaArquivoInfo(false, false, null);
+        }
+        return competenciaMensalRepository.findByAnoAndMes(ano, mes)
+                .map(c -> new CompetenciaArquivoInfo(true, c.isArquivada(), c.getArquivadaEm()))
+                .orElse(new CompetenciaArquivoInfo(false, false, null));
+    }
+
+    public record CompetenciaArquivoInfo(boolean existeCompetencia, boolean arquivada, LocalDateTime arquivadaEm) {
     }
 }

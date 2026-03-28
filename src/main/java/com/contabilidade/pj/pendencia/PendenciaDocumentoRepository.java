@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PendenciaDocumentoRepository extends JpaRepository<PendenciaDocumento, Long> {
 
+    List<PendenciaDocumento> findByCompetenciaId(Long competenciaId);
+
     List<PendenciaDocumento> findByCompetenciaAnoAndCompetenciaMesOrderByEmpresaRazaoSocialAscTemplateDocumentoNomeAsc(
             Integer ano,
             Integer mes

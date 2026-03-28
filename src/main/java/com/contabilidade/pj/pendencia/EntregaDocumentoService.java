@@ -21,17 +21,20 @@ public class EntregaDocumentoService {
     private final EntregaDocumentoRepository entregaDocumentoRepository;
     private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
     private final DocumentoInteligenciaService documentoInteligenciaService;
+    private final CompetenciaArquivamentoService competenciaArquivamentoService;
     private final Path uploadBasePath;
 
     public EntregaDocumentoService(
             EntregaDocumentoRepository entregaDocumentoRepository,
             PendenciaDocumentoRepository pendenciaDocumentoRepository,
             DocumentoInteligenciaService documentoInteligenciaService,
+            CompetenciaArquivamentoService competenciaArquivamentoService,
             @Value("${app.upload.dir:uploads/pendencias}") String uploadDir
     ) {
         this.entregaDocumentoRepository = entregaDocumentoRepository;
         this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
         this.documentoInteligenciaService = documentoInteligenciaService;
+        this.competenciaArquivamentoService = competenciaArquivamentoService;
         this.uploadBasePath = Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 
@@ -72,6 +75,7 @@ public class EntregaDocumentoService {
 
             pendencia.setStatus(PendenciaStatus.ENVIADO);
             pendenciaDocumentoRepository.save(pendencia);
+            competenciaArquivamentoService.sincronizarArquivamentoCompetencia(pendencia.getCompetencia().getId());
             EntregaDocumento salva = entregaDocumentoRepository.save(entrega);
             documentoInteligenciaService.iniciarProcessamento(salva);
             return salva;
