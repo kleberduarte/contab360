@@ -1,5 +1,9 @@
 import { Sessao } from "./session";
 
+// Em produção (Vercel), aponta para o backend no Railway via VITE_API_BASE_URL.
+// Em desenvolvimento, usa string vazia para aproveitar o proxy do Vite (/api -> localhost:8080).
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+
 type RequestOptions = RequestInit & {
   sessao?: Sessao | null;
 };
@@ -33,7 +37,7 @@ export async function apiFetchJson<T>(url: string, options: RequestOptions = {})
     if (!finalHeaders.has("Pragma")) finalHeaders.set("Pragma", "no-cache");
   }
 
-  const response = await fetchWithTimeout(url, {
+  const response = await fetchWithTimeout(API_BASE + url, {
     ...rest,
     headers: finalHeaders,
     cache: rest.cache ?? (isGet ? "no-store" : undefined)
@@ -57,7 +61,7 @@ export async function apiFetchFormData<T>(url: string, formData: FormData, sessa
   if (sessao?.token) {
     headers.set("Authorization", `Bearer ${sessao.token}`);
   }
-  const response = await fetchWithTimeout(url, {
+  const response = await fetchWithTimeout(API_BASE + url, {
     method: "POST",
     body: formData,
     headers,
