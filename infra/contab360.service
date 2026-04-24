@@ -1,0 +1,38 @@
+# Systemd service para o Contab360
+# Instale em: /etc/systemd/system/contab360.service
+# Depois: sudo systemctl daemon-reload && sudo systemctl enable contab360
+
+[Unit]
+Description=Contab360 Spring Boot
+After=network.target mysql.service
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=contab360
+Group=contab360
+WorkingDirectory=/opt/contab360
+
+# Variaveis de ambiente — nunca exponha senhas em argumentos de linha de comando
+EnvironmentFile=/opt/contab360/prod.env
+
+ExecStart=/usr/bin/java \
+  -jar /opt/contab360/contab360-0.0.1-SNAPSHOT.jar \
+  --spring.profiles.active=prod
+
+# Reiniciar automaticamente em caso de falha
+Restart=on-failure
+RestartSec=10
+
+# Segurança: restringir o que o processo pode fazer
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/contab360 /var/log/contab360
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=contab360
+
+[Install]
+WantedBy=multi-user.target

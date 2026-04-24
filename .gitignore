@@ -23,6 +23,9 @@ frontend/vite.config.js
 # Credenciais locais (copie mysql-local.env.example)
 mysql-local.env
 
+# Credenciais de produção (copie prod.env.example)
+prod.env
+
 # Arquivos enviados em runtime
 uploads/
 
