@@ -15,6 +15,10 @@ frontend/.vite/
 frontend/.cache/
 frontend/.turbo/
 frontend/coverage/
+frontend/*.tsbuildinfo
+frontend/tsconfig.*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
 
 # Credenciais locais (copie mysql-local.env.example)
 mysql-local.env

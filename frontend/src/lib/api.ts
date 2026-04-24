@@ -1,0 +1,81 @@
+import { Sessao } from "./session";
+
+type RequestOptions = RequestInit & {
+  sessao?: Sessao | null;
+};
+
+const REQUEST_TIMEOUT_MS = 20000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+export async function apiFetchJson<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  const { sessao, headers, ...rest } = options;
+  const method = (rest.method || "GET").toUpperCase();
+  const isGet = method === "GET";
+  const finalHeaders = new Headers(headers || {});
+
+  if (!finalHeaders.has("Content-Type") && rest.body) {
+    finalHeaders.set("Content-Type", "application/json");
+  }
+  if (sessao?.token) {
+    finalHeaders.set("Authorization", `Bearer ${sessao.token}`);
+  }
+  if (isGet) {
+    if (!finalHeaders.has("Cache-Control")) finalHeaders.set("Cache-Control", "no-cache");
+    if (!finalHeaders.has("Pragma")) finalHeaders.set("Pragma", "no-cache");
+  }
+
+  const response = await fetchWithTimeout(url, {
+    ...rest,
+    headers: finalHeaders,
+    cache: rest.cache ?? (isGet ? "no-store" : undefined)
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Erro HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+/** POST multipart/form-data (não define Content-Type — o browser define boundary). */
+export async function apiFetchFormData<T>(url: string, formData: FormData, sessao: Sessao | null): Promise<T> {
+  const headers = new Headers();
+  if (sessao?.token) {
+    headers.set("Authorization", `Bearer ${sessao.token}`);
+  }
+  const response = await fetchWithTimeout(url, {
+    method: "POST",
+    body: formData,
+    headers,
+    cache: "no-store"
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    let msg = text || `Erro HTTP ${response.status}`;
+    try {
+      const err = JSON.parse(text) as { message?: string };
+      if (err.message) msg = err.message;
+    } catch {
+      /* texto não é JSON */
+    }
+    throw new Error(msg);
+  }
+  if (response.status === 204 || !text) {
+    return undefined as T;
+  }
+  return JSON.parse(text) as T;
+}
