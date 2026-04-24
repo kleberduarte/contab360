@@ -55,3 +55,11 @@ export const ClientePendenciasPage = lazy(() =>
 export const ClienteUploadPage = lazy(() =>
   import("../features/cliente/ClienteUploadPage").then((m) => ({ default: m.ClienteUploadPage }))
 );
+
+export const UsuariosPage = lazy(() =>
+  import("../features/usuarios/UsuariosPage").then((m) => ({ default: m.UsuariosPage }))
+);
+
+export const MinhaContaPage = lazy(() =>
+  import("../features/usuarios/MinhaContaPage").then((m) => ({ default: m.MinhaContaPage }))
+);

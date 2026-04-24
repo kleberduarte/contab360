@@ -15,11 +15,14 @@ import {
   FiscalNotasPage,
   IaObservadoraPage,
   IaRevisaoPage,
+  MinhaContaPage,
   PendenciasPage,
-  TemplatesPage
+  TemplatesPage,
+  UsuariosPage
 } from "./routes/lazyPages";
 import { clearSessao, getSessao, PerfilUsuario, Sessao, setSessao } from "./lib/session";
 import { HeaderUserMenu } from "./components/HeaderUserMenu";
+import { useNavigate } from "react-router-dom";
 
 function GuardContador({ sessao, children }: { sessao: Sessao; children: ReactNode }) {
   if (sessao.perfil !== "CONTADOR" && sessao.perfil !== "ADM") {
@@ -35,8 +38,9 @@ function GuardAdmin({ sessao, children }: { sessao: Sessao; children: ReactNode 
   return <>{children}</>;
 }
 
-function AppShell({ sessao, onLogout }: { sessao: Sessao; onLogout: () => void }) {
+function AppShell({ sessao, onLogout, onNomeAtualizado }: { sessao: Sessao; onLogout: () => void; onNomeAtualizado: (nome: string) => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const linkGroups = useMemo(() => getLinkGroupsByPerfil(sessao.perfil), [sessao.perfil]);
   const links = useMemo(() => linkGroups.flatMap((group) => group.links), [linkGroups]);
   const [navOpen, setNavOpen] = useState(false);
@@ -165,7 +169,7 @@ function AppShell({ sessao, onLogout }: { sessao: Sessao; onLogout: () => void }
             </p>
           </div>
           <div className="shell-header-react__session">
-            <HeaderUserMenu sessao={sessao} onLogout={onLogout} />
+            <HeaderUserMenu sessao={sessao} onLogout={onLogout} onMinhaContaClick={() => navigate("/minha-conta")} />
           </div>
         </header>
         <Suspense fallback={<AppRouteFallback />}>
@@ -263,6 +267,18 @@ function AppShell({ sessao, onLogout }: { sessao: Sessao; onLogout: () => void }
                 </GuardContador>
               }
             />
+            <Route
+              path="/usuarios"
+              element={
+                <GuardContador sessao={sessao}>
+                  <UsuariosPage sessao={sessao} />
+                </GuardContador>
+              }
+            />
+            <Route
+              path="/minha-conta"
+              element={<MinhaContaPage sessao={sessao} onNomeAtualizado={onNomeAtualizado} />}
+            />
             <Route path="/cliente-portal" element={<DashboardPage sessao={sessao} />} />
             <Route
               path="/cliente-pendencias"
@@ -303,7 +319,8 @@ type LinkIcon =
   | "money"
   | "shield"
   | "alert"
-  | "upload";
+  | "upload"
+  | "users";
 
 function renderMenuIcon(icon: LinkIcon) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -403,6 +420,14 @@ function renderMenuIcon(icon: LinkIcon) {
           <path {...common} d="M4 15.75V18.25H20V15.75" />
         </svg>
       );
+    case "users":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle {...common} cx="9" cy="8" r="3" />
+          <path {...common} d="M3 20c0-3.31 2.69-6 6-6s6 2.69 6 6" />
+          <path {...common} d="M16 3.13a4 4 0 0 1 0 7.75M21 20c0-2.76-2.24-5-5-5" />
+        </svg>
+      );
   }
 }
 
@@ -429,6 +454,7 @@ function getLinkGroupsByPerfil(perfil: PerfilUsuario): LinkGroup[] {
       links: [
         { path: "/dashboard", label: "Dashboard", icon: "home" },
         { path: "/empresas", label: "Empresas", icon: "building" },
+        { path: "/usuarios", label: "Usuários", icon: "users" },
         { path: "/templates", label: "Templates", icon: "template" },
         { path: "/pendencias", label: "Pendencias", icon: "tasks" }
       ]
@@ -471,5 +497,16 @@ export function App() {
     window.history.replaceState(null, "", "/login");
   }
 
-  return sessao ? <AppShell sessao={sessao} onLogout={onLogout} /> : <LoginPage onLogin={onLogin} />;
+  function onNomeAtualizado(novoNome: string) {
+    if (!sessao) return;
+    const atualizada = { ...sessao, usuarioNome: novoNome };
+    setSessao(atualizada);
+    setSessaoState(atualizada);
+  }
+
+  return sessao ? (
+    <AppShell sessao={sessao} onLogout={onLogout} onNomeAtualizado={onNomeAtualizado} />
+  ) : (
+    <LoginPage onLogin={onLogin} />
+  );
 }

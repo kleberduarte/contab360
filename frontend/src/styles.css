@@ -1115,6 +1115,196 @@ button.danger {
   }
 }
 
+/* ── Usuários ─────────────────────────────────── */
+.usuarios-react-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.usuarios-react-form,
+.usuarios-react-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.usuarios-react-form h3,
+.usuarios-react-list h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.usuarios-react-form label,
+.usuarios-react-list label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+  color: var(--text-muted, #64748b);
+}
+
+.usuarios-react-form input,
+.usuarios-react-form select,
+.usuarios-react-list input {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.usuarios-react-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.usuarios-react-list-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.usuarios-react-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.usuarios-react-table th,
+.usuarios-react-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.usuarios-react-table tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.018);
+}
+
+.usuarios-react-table tbody tr:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.035));
+}
+
+.usuarios-react-table th {
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted, #64748b);
+}
+
+.usuarios-react-table td:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.usuarios-email {
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+}
+
+.row-inativo td {
+  opacity: 0.55;
+}
+
+.senha-temp-box {
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.senha-temp-code {
+  display: inline-block;
+  background: #fff;
+  border: 1.5px dashed #10b981;
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font-size: 1.25rem;
+  font-family: monospace;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: #065f46;
+  margin: 0.25rem 0;
+}
+
+/* ── Minha Conta ──────────────────────────────── */
+.minha-conta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 380px));
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+}
+
+.minha-conta-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.minha-conta-card h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.minha-conta-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+  color: var(--text-muted, #64748b);
+}
+
+.minha-conta-card input {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.minha-conta-card input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.perfil-badge {
+  font-size: 0.78rem;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: 99px;
+  padding: 0.15rem 0.6rem;
+  font-weight: 600;
+}
+
+@media (max-width: 980px) {
+  .usuarios-react-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .small {
   font-size: 0.8rem;
 }

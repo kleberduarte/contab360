@@ -12,7 +12,7 @@ function iniciais(sessao: Sessao): string {
   return s || "?";
 }
 
-export function HeaderUserMenu({ sessao, onLogout }: { sessao: Sessao; onLogout: () => void }) {
+export function HeaderUserMenu({ sessao, onLogout, onMinhaContaClick }: { sessao: Sessao; onLogout: () => void; onMinhaContaClick: () => void }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +36,7 @@ export function HeaderUserMenu({ sessao, onLogout }: { sessao: Sessao; onLogout:
   const initials = iniciais(sessao);
   const nome = sessao.usuarioNome || sessao.usuarioEmail || "Usuário";
   const email = sessao.usuarioEmail;
-  const perfilLabel = sessao.perfil === "CONTADOR" ? "Contador" : "Cliente";
+  const perfilLabel = sessao.perfil === "ADM" ? "Administrador" : sessao.perfil === "CONTADOR" ? "Contador" : "Cliente";
 
   return (
     <div ref={wrapRef} className="header-user-menu-react">
@@ -81,7 +81,7 @@ export function HeaderUserMenu({ sessao, onLogout }: { sessao: Sessao; onLogout:
             type="button"
             className="header-user-menu-react__link"
             role="menuitem"
-            onClick={() => setOpen(false)}
+            onClick={() => { setOpen(false); onMinhaContaClick(); }}
           >
             Minha conta
           </button>

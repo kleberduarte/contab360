@@ -50,7 +50,11 @@ public class AuthService {
         if (sessao.getExpiraEm().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Sessão expirada.");
         }
-        return sessao.getUsuario();
+        Usuario usuario = sessao.getUsuario();
+        if (!usuario.isAtivo()) {
+            throw new IllegalArgumentException("Usuário desativado.");
+        }
+        return usuario;
     }
 
     public BCryptPasswordEncoder passwordEncoder() {

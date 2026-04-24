@@ -38,6 +38,9 @@ public class Usuario {
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
 
+    @Column(nullable = false)
+    private boolean ativo = true;
+
     public Long getId() {
         return id;
     }
@@ -80,5 +83,13 @@ public class Usuario {
 
     public void setEmpresa(Empresa empresa) {
         this.empresa = empresa;
+    }
+
+    public boolean isAtivo() {
+        return ativo;
+    }
+
+    public void setAtivo(boolean ativo) {
+        this.ativo = ativo;
     }
 }
