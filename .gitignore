@@ -8,3 +8,32 @@
 .classpath
 .settings/
 *.log
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/.turbo/
+frontend/coverage/
+frontend/*.tsbuildinfo
+frontend/tsconfig.*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
+
+# Credenciais locais (copie mysql-local.env.example)
+mysql-local.env
+
+# Credenciais de produção (copie prod.env.example)
+prod.env
+
+# Arquivos enviados em runtime
+uploads/
+
+# Arquivos temporarios de JVM (Windows)
+**/hsperfdata_*/
+contab360123/
+
+# Arquivos de teste NFSe gerados localmente
+nfse-teste-*.pdf
+nfse-teste-*.json
+nfse-teste-*.txt

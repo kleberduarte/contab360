@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["jdk17"]
+
+[phases.build]
+cmds = ["./mvnw clean package -DskipTests -q"]
+
+[start]
+cmd = "java -jar target/contab360-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod"

@@ -7,7 +7,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "empresas")
@@ -25,6 +27,21 @@ public class Empresa {
     @NotBlank
     @Column(nullable = false)
     private String razaoSocial;
+
+    @Column(length = 11)
+    @Pattern(regexp = "^\\d{11}$", message = "cpfResponsavel deve conter 11 digitos.")
+    private String cpfResponsavel;
+
+    @Column(nullable = false)
+    private boolean mei;
+
+    private LocalDate vencimentoDas;
+
+    private LocalDate vencimentoCertificadoMei;
+
+    /** Quando {@code false}, a empresa está desativada (exclusão lógica) e não entra em listagens operacionais. */
+    @Column(nullable = false)
+    private boolean ativo = true;
 
     public Long getId() {
         return id;
@@ -48,5 +65,45 @@ public class Empresa {
 
     public void setRazaoSocial(String razaoSocial) {
         this.razaoSocial = razaoSocial;
+    }
+
+    public String getCpfResponsavel() {
+        return cpfResponsavel;
+    }
+
+    public void setCpfResponsavel(String cpfResponsavel) {
+        this.cpfResponsavel = cpfResponsavel;
+    }
+
+    public boolean isMei() {
+        return mei;
+    }
+
+    public void setMei(boolean mei) {
+        this.mei = mei;
+    }
+
+    public LocalDate getVencimentoDas() {
+        return vencimentoDas;
+    }
+
+    public void setVencimentoDas(LocalDate vencimentoDas) {
+        this.vencimentoDas = vencimentoDas;
+    }
+
+    public LocalDate getVencimentoCertificadoMei() {
+        return vencimentoCertificadoMei;
+    }
+
+    public void setVencimentoCertificadoMei(LocalDate vencimentoCertificadoMei) {
+        this.vencimentoCertificadoMei = vencimentoCertificadoMei;
+    }
+
+    public boolean isAtivo() {
+        return ativo;
+    }
+
+    public void setAtivo(boolean ativo) {
+        this.ativo = ativo;
     }
 }
