@@ -1,6 +1,7 @@
 package com.contabilidade.pj.auth;
 
 import com.contabilidade.pj.ia.IaObservadoraInterceptor;
+import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -27,7 +28,13 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         if (corsOrigins == null || corsOrigins.isBlank()) return;
-        String[] origins = corsOrigins.split(",");
+        String[] origins = Arrays.stream(corsOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toArray(String[]::new);
+        if (origins.length == 0) {
+            return;
+        }
         registry.addMapping("/api/**")
                 .allowedOrigins(origins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
