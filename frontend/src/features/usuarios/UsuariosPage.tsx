@@ -34,6 +34,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   const [form, setForm] = useState<FormState>(initialForm);
   const [senhaTempRevelada, setSenhaTempRevelada] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [resetSenhaId, setResetSenhaId] = useState<number | null>(null);
 
   const perfisDisponiveis = sessao.perfil === "ADM" ? PERFIS_ADM : PERFIS_CONTADOR;
 
@@ -118,6 +119,21 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
     setConfirmId(id);
   }
 
+  const confirmarResetSenha = useCallback(async () => {
+    const id = resetSenhaId;
+    setResetSenhaId(null);
+    if (id == null) return;
+    setErro("");
+    setOk("");
+    try {
+      const resp = await apiFetchJson<UsuarioResponse>(`/api/usuarios/${id}/redefinir-senha`, { method: "POST", sessao });
+      if (resp.senhaTempRevelada) setSenhaTempRevelada(resp.senhaTempRevelada);
+      setOk("Senha redefinida com sucesso.");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível redefinir a senha.");
+    }
+  }, [resetSenhaId, sessao]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const confirmarDesativar = useCallback(async () => {
     const id = confirmId;
     setConfirmId(null);
@@ -149,6 +165,15 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   return (
     <>
     <ConfirmDialog
+      open={resetSenhaId != null}
+      title="Redefinir senha"
+      message="Uma nova senha temporária será gerada. O usuário precisará alterá-la em 'Minha conta' após o próximo acesso."
+      confirmLabel="Redefinir"
+      cancelLabel="Cancelar"
+      onConfirm={() => void confirmarResetSenha()}
+      onCancel={() => setResetSenhaId(null)}
+    />
+    <ConfirmDialog
       open={confirmId != null}
       title="Desativar usuário"
       message="O usuário será desativado e não poderá mais acessar o sistema. Você pode reativá-lo depois."
@@ -164,7 +189,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
 
       {senhaTempRevelada ? (
         <div className="senha-temp-box">
-          <strong>Usuário criado!</strong> Compartilhe a senha temporária com o usuário:
+          <strong>{editandoId ? "Senha redefinida!" : "Usuário criado!"}</strong> Compartilhe a senha temporária com o usuário:
           <code className="senha-temp-code">{senhaTempRevelada}</code>
           <p className="muted-react small">Esta senha não será exibida novamente. O usuário deve alterá-la em "Minha conta".</p>
           <button type="button" className="ghost small" onClick={() => setSenhaTempRevelada(null)}>Fechar</button>
@@ -206,6 +231,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
             {editandoId != null ? (
               <>
                 <button type="button" className="ghost" onClick={limparEdicao}>Cancelar</button>
+                <button type="button" className="ghost" onClick={() => setResetSenhaId(editandoId)}>Redefinir senha</button>
                 <button type="button" className="danger" onClick={() => desativar(editandoId)}>Desativar</button>
               </>
             ) : null}

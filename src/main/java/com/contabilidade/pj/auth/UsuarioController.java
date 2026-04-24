@@ -60,4 +60,11 @@ public class UsuarioController {
         usuarioService.reativar(id, usuario);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/redefinir-senha")
+    public UsuarioService.UsuarioResponse redefinirSenha(@PathVariable Long id) {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) throw new IllegalArgumentException("Usuário não autenticado.");
+        return usuarioService.redefinirSenha(id, usuario);
+    }
 }

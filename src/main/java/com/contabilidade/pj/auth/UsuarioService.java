@@ -130,6 +130,25 @@ public class UsuarioService {
     }
 
     @Transactional
+    public UsuarioResponse redefinirSenha(Long id, Usuario usuarioAtual) {
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
+            throw new IllegalArgumentException("Sem permissão para redefinir senhas.");
+        }
+        if (id.equals(usuarioAtual.getId())) {
+            throw new IllegalArgumentException("Use 'Minha conta' para alterar sua própria senha.");
+        }
+        Usuario target = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR && target.getPerfil() != PerfilUsuario.CLIENTE) {
+            throw new IllegalArgumentException("Contador só pode redefinir senhas de usuários do tipo CLIENTE.");
+        }
+        String senhaTemp = gerarSenhaTemp();
+        target.setSenhaHash(authService.passwordEncoder().encode(senhaTemp));
+        usuarioRepository.save(target);
+        return toResponse(target, senhaTemp);
+    }
+
+    @Transactional
     public void trocarSenha(String senhaAtual, String novaSenha, Usuario usuarioAtual) {
         Usuario u = usuarioRepository.findById(usuarioAtual.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
