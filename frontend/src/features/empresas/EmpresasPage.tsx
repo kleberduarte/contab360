@@ -1,6 +1,7 @@
-import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
 import { Sessao } from "../../lib/session";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 type Empresa = {
   id: number;
@@ -80,6 +81,7 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
   const [incluirInativas, setIncluirInativas] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [form, setForm] = useState<EmpresaFormState>(initialForm);
+  const [confirmEmpresaId, setConfirmEmpresaId] = useState<number | null>(null);
 
   async function carregarEmpresas() {
     setCarregando(true);
@@ -174,8 +176,14 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
     }
   }
 
-  async function desativarEmpresa(id: number) {
-    if (!window.confirm("A empresa será desativada. Deseja continuar?")) return;
+  function desativarEmpresa(id: number) {
+    setConfirmEmpresaId(id);
+  }
+
+  const confirmarDesativarEmpresa = useCallback(async () => {
+    const id = confirmEmpresaId;
+    setConfirmEmpresaId(null);
+    if (id == null) return;
     setErro("");
     setOk("");
     try {
@@ -186,7 +194,7 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível desativar.");
     }
-  }
+  }, [confirmEmpresaId, editandoId, sessao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function reativarEmpresa(id: number) {
     setErro("");
@@ -201,6 +209,17 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
   }
 
   return (
+    <>
+    <ConfirmDialog
+      open={confirmEmpresaId != null}
+      title="Desativar empresa"
+      message="A empresa será desativada e ocultada dos cadastros. Pendências, templates e usuários permanecem no histórico. Você pode reativá-la depois."
+      confirmLabel="Desativar"
+      cancelLabel="Cancelar"
+      danger
+      onConfirm={() => void confirmarDesativarEmpresa()}
+      onCancel={() => setConfirmEmpresaId(null)}
+    />
     <section className="page page--modern">
       <h2>Empresas</h2>
       <p className="muted-react">Cadastro e gestão das empresas do escritório.</p>
@@ -352,5 +371,6 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
         </div>
       </div>
     </section>
+    </>
   );
 }

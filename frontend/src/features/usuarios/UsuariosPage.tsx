@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useDeferredValue, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useDeferredValue, useMemo, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
 import { Sessao } from "../../lib/session";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 type Empresa = { id: number; razaoSocial: string };
 type Usuario = {
@@ -32,6 +33,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(initialForm);
   const [senhaTempRevelada, setSenhaTempRevelada] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   const perfisDisponiveis = sessao.perfil === "ADM" ? PERFIS_ADM : PERFIS_CONTADOR;
 
@@ -112,8 +114,14 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
     }
   }
 
-  async function desativar(id: number) {
-    if (!window.confirm("O usuário será desativado. Deseja continuar?")) return;
+  function desativar(id: number) {
+    setConfirmId(id);
+  }
+
+  const confirmarDesativar = useCallback(async () => {
+    const id = confirmId;
+    setConfirmId(null);
+    if (id == null) return;
     setErro("");
     setOk("");
     try {
@@ -124,7 +132,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível desativar.");
     }
-  }
+  }, [confirmId, editandoId, sessao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function reativar(id: number) {
     setErro("");
@@ -139,6 +147,17 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   }
 
   return (
+    <>
+    <ConfirmDialog
+      open={confirmId != null}
+      title="Desativar usuário"
+      message="O usuário será desativado e não poderá mais acessar o sistema. Você pode reativá-lo depois."
+      confirmLabel="Desativar"
+      cancelLabel="Cancelar"
+      danger
+      onConfirm={() => void confirmarDesativar()}
+      onCancel={() => setConfirmId(null)}
+    />
     <section className="page page--modern">
       <h2>Usuários</h2>
       <p className="muted-react">Gerencie os acessos ao sistema.</p>
@@ -250,5 +269,6 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
         </div>
       </div>
     </section>
+    </>
   );
 }
