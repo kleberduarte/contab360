@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Contab360">
+  <defs>
+    <linearGradient id="g" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#21c25e"/>
+      <stop offset="1" stop-color="#0fa96a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#g)"/>
+  <rect x="48" y="48" width="416" height="416" rx="96" fill="#fff" opacity="0.14"/>
+  <circle cx="256" cy="256" r="168" stroke="#fff" stroke-width="28" fill="none" opacity="0.95"/>
+  <circle cx="256" cy="256" r="40" fill="#fff"/>
+</svg>
