@@ -5,6 +5,7 @@ export type Sessao = {
   usuarioNome: string;
   usuarioEmail: string;
   perfil: PerfilUsuario;
+  senhaTempAtiva?: boolean;
 };
 
 const STORAGE_KEY = "contabpj_session";
@@ -29,7 +30,7 @@ export function normalizeSessao(raw: unknown): Sessao | null {
   const p = o.perfil;
   const perfil = p === "ADM" || p === "CONTADOR" || p === "CLIENTE" ? p : null;
   if (!perfil) return null;
-  return { token: o.token, usuarioNome: nome, usuarioEmail: email, perfil };
+  return { token: o.token, usuarioNome: nome, usuarioEmail: email, perfil, senhaTempAtiva: o.senhaTempAtiva === true };
 }
 
 export function getSessao(): Sessao | null {

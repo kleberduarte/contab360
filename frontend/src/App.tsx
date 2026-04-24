@@ -2,6 +2,7 @@ import { ReactNode, Suspense, useEffect, useMemo, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AppRouteFallback } from "./components/AppRouteFallback";
 import { LoginPage } from "./features/auth/LoginPage";
+import { PrimeiroAcessoPage } from "./features/auth/PrimeiroAcessoPage";
 import {
   ClientePendenciasPage,
   ClienteUploadPage,
@@ -512,9 +513,14 @@ export function App() {
     setSessaoState(atualizada);
   }
 
-  return sessao ? (
-    <AppShell sessao={sessao} onLogout={onLogout} onNomeAtualizado={onNomeAtualizado} />
-  ) : (
-    <LoginPage onLogin={onLogin} />
-  );
+  function onSenhaCriada() {
+    if (!sessao) return;
+    const atualizada = { ...sessao, senhaTempAtiva: false };
+    setSessao(atualizada);
+    setSessaoState(atualizada);
+  }
+
+  if (!sessao) return <LoginPage onLogin={onLogin} />;
+  if (sessao.senhaTempAtiva) return <PrimeiroAcessoPage sessao={sessao} onSenhaCriada={onSenhaCriada} />;
+  return <AppShell sessao={sessao} onLogout={onLogout} onNomeAtualizado={onNomeAtualizado} />;
 }

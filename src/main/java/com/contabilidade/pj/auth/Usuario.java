@@ -41,6 +41,9 @@ public class Usuario {
     @Column(nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean ativo = true;
 
+    @Column(nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
+    private boolean senhaTempAtiva = false;
+
     public Long getId() {
         return id;
     }
@@ -91,5 +94,13 @@ public class Usuario {
 
     public void setAtivo(boolean ativo) {
         this.ativo = ativo;
+    }
+
+    public boolean isSenhaTempAtiva() {
+        return senhaTempAtiva;
+    }
+
+    public void setSenhaTempAtiva(boolean senhaTempAtiva) {
+        this.senhaTempAtiva = senhaTempAtiva;
     }
 }

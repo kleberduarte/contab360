@@ -2137,6 +2137,119 @@ button.small:hover:not(:disabled) {
   cursor: pointer;
 }
 
+/* ── Primeiro Acesso (forçar troca de senha) ─── */
+.primeiro-acesso-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(ellipse 800px 500px at 10% 0%, rgba(33, 194, 94, 0.10), transparent 55%),
+    radial-gradient(ellipse 600px 400px at 90% 100%, rgba(59, 130, 246, 0.07), transparent 50%),
+    var(--bg);
+}
+
+.primeiro-acesso-card {
+  width: min(440px, 100%);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 20px;
+  padding: 2rem 2rem 1.65rem;
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(15, 23, 42, 0.04) inset;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.primeiro-acesso-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+
+.primeiro-acesso-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.primeiro-acesso-lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.93rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.primeiro-acesso-lead strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.primeiro-acesso-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.primeiro-acesso-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.primeiro-acesso-label .login-input-wrap-react input {
+  padding-left: 2.35rem;
+  padding-right: 2.35rem;
+}
+
+.primeiro-acesso-submit {
+  width: 100%;
+  border: none;
+  border-radius: 11px;
+  min-height: 44px;
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
+  transition: filter 0.18s ease, transform 0.12s ease;
+  margin-top: 0.25rem;
+}
+
+.primeiro-acesso-submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.primeiro-acesso-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.primeiro-acesso-submit:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.primeiro-acesso-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+
 /* ── ConfirmDialog ────────────────────────────── */
 .confirm-dialog-backdrop {
   position: fixed;

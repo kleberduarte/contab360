@@ -60,6 +60,7 @@ public class UsuarioService {
         usuario.setEmpresa(empresa);
         usuario.setSenhaHash(authService.passwordEncoder().encode(senhaTemp));
         usuario.setAtivo(true);
+        usuario.setSenhaTempAtiva(true);
         usuarioRepository.save(usuario);
         return toResponse(usuario, senhaTemp);
     }
@@ -144,6 +145,7 @@ public class UsuarioService {
         }
         String senhaTemp = gerarSenhaTemp();
         target.setSenhaHash(authService.passwordEncoder().encode(senhaTemp));
+        target.setSenhaTempAtiva(true);
         usuarioRepository.save(target);
         return toResponse(target, senhaTemp);
     }
@@ -159,6 +161,19 @@ public class UsuarioService {
             throw new IllegalArgumentException("A nova senha deve ter pelo menos 6 caracteres.");
         }
         u.setSenhaHash(authService.passwordEncoder().encode(novaSenha));
+        u.setSenhaTempAtiva(false);
+        usuarioRepository.save(u);
+    }
+
+    @Transactional
+    public void definirNovaSenha(String novaSenha, Usuario usuarioAtual) {
+        if (novaSenha == null || novaSenha.length() < 6) {
+            throw new IllegalArgumentException("A senha deve ter pelo menos 6 caracteres.");
+        }
+        Usuario u = usuarioRepository.findById(usuarioAtual.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        u.setSenhaHash(authService.passwordEncoder().encode(novaSenha));
+        u.setSenhaTempAtiva(false);
         usuarioRepository.save(u);
     }
 

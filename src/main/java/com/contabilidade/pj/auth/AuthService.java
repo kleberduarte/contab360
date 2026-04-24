@@ -68,7 +68,8 @@ public class AuthService {
             String nome,
             String email,
             String perfil,
-            Long empresaId
+            Long empresaId,
+            boolean senhaTempAtiva
     ) {
         static LoginResponse from(Usuario usuario, String token, LocalDateTime expiraEm) {
             return new LoginResponse(
@@ -78,7 +79,8 @@ public class AuthService {
                     usuario.getNome(),
                     usuario.getEmail(),
                     usuario.getPerfil().name(),
-                    usuario.getEmpresa() != null ? usuario.getEmpresa().getId() : null
+                    usuario.getEmpresa() != null ? usuario.getEmpresa().getId() : null,
+                    usuario.isSenhaTempAtiva()
             );
         }
     }

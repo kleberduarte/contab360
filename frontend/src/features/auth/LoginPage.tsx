@@ -12,6 +12,7 @@ type LoginResponse = {
   nome: string;
   email: string;
   perfil: string;
+  senhaTempAtiva?: boolean;
 };
 
 function loginResponseToSessao(data: LoginResponse): Sessao {
@@ -23,7 +24,8 @@ function loginResponseToSessao(data: LoginResponse): Sessao {
     token: data.token,
     usuarioNome: data.nome ?? "",
     usuarioEmail: data.email ?? "",
-    perfil
+    perfil,
+    senhaTempAtiva: data.senhaTempAtiva === true
   };
 }
 

@@ -3,6 +3,7 @@ package com.contabilidade.pj.auth;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -56,4 +57,16 @@ public class AuthController {
     public record AtualizarNomeRequest(
             @NotBlank String nome
     ) {}
+
+    public record DefinirNovaSenhaRequest(
+            @NotBlank @Size(min = 6) String novaSenha
+    ) {}
+
+    @PostMapping("/definir-nova-senha")
+    public ResponseEntity<Void> definirNovaSenha(@Valid @RequestBody DefinirNovaSenhaRequest req) {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) throw new IllegalArgumentException("Usuário não autenticado.");
+        usuarioService.definirNovaSenha(req.novaSenha(), usuario);
+        return ResponseEntity.noContent().build();
+    }
 }
