@@ -1,5 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Contab360">
-  <rect width="512" height="512" rx="112" fill="#2563eb"/>
-  <path fill="#fff" d="M128 256c0-70.7 57.3-128 128-128s128 57.3 128 128-57.3 128-128 128c-35.3 0-67.2-14.3-90.5-37.5l45.3-45.3C228 310 240.7 320 256 320c35.3 0 64-28.7 64-64s-28.7-64-64-64-64 28.7-64 64H128z"/>
-  <text x="256" y="360" text-anchor="middle" fill="#fff" font-family="system-ui,Segoe UI,sans-serif" font-size="120" font-weight="700">360</text>
+  <defs>
+    <linearGradient id="g" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#21c25e"/>
+      <stop offset="1" stop-color="#0fa96a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#g)"/>
+  <rect x="48" y="48" width="416" height="416" rx="96" fill="#fff" opacity="0.14"/>
+  <circle cx="256" cy="256" r="168" stroke="#fff" stroke-width="28" fill="none" opacity="0.95"/>
+  <circle cx="256" cy="256" r="40" fill="#fff"/>
 </svg>

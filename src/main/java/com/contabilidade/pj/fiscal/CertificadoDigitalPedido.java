@@ -1,17 +1,22 @@
 package com.contabilidade.pj.fiscal;
 
+import com.contabilidade.pj.empresa.Empresa;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -42,8 +47,18 @@ public class CertificadoDigitalPedido {
     @Column(nullable = false)
     private Integer validadeMeses;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "empresa_id")
+    private Empresa empresa;
+
+    /** Previsão de vencimento do certificado (para alertas e lembretes). */
+    private LocalDate dataVencimentoPrevista;
+
+    @Column(length = 4000)
+    private String observacaoInterna;
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 15)
+    @Column(nullable = false, length = 30)
     private StatusCertificado status;
 
     @Column(nullable = false)
@@ -105,6 +120,30 @@ public class CertificadoDigitalPedido {
 
     public void setValidadeMeses(Integer validadeMeses) {
         this.validadeMeses = validadeMeses;
+    }
+
+    public Empresa getEmpresa() {
+        return empresa;
+    }
+
+    public void setEmpresa(Empresa empresa) {
+        this.empresa = empresa;
+    }
+
+    public LocalDate getDataVencimentoPrevista() {
+        return dataVencimentoPrevista;
+    }
+
+    public void setDataVencimentoPrevista(LocalDate dataVencimentoPrevista) {
+        this.dataVencimentoPrevista = dataVencimentoPrevista;
+    }
+
+    public String getObservacaoInterna() {
+        return observacaoInterna;
+    }
+
+    public void setObservacaoInterna(String observacaoInterna) {
+        this.observacaoInterna = observacaoInterna;
     }
 
     public StatusCertificado getStatus() {

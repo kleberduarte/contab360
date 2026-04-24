@@ -2,6 +2,7 @@ package com.contabilidade.pj.fiscal;
 
 import com.contabilidade.pj.auth.PerfilUsuario;
 import com.contabilidade.pj.auth.Usuario;
+import com.contabilidade.pj.config.Contab360FeaturesProperties;
 import com.contabilidade.pj.empresa.Empresa;
 import com.contabilidade.pj.empresa.EmpresaRepository;
 import com.contabilidade.pj.fiscal.sefaz.AutorizacaoFiscalPort;
@@ -13,8 +14,10 @@ import java.io.IOException;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class FiscalService {
@@ -27,6 +30,7 @@ public class FiscalService {
     private final AutorizacaoFiscalPort autorizacaoFiscalPort;
     private final NfseEmissaoPort nfseEmissaoPort;
     private final DanfeSimulacaoPdfService danfeSimulacaoPdfService;
+    private final Contab360FeaturesProperties featuresProperties;
 
     public FiscalService(
             NotaFiscalRepository notaFiscalRepository,
@@ -37,7 +41,8 @@ public class FiscalService {
             EmpresaRepository empresaRepository,
             AutorizacaoFiscalPort autorizacaoFiscalPort,
             NfseEmissaoPort nfseEmissaoPort,
-            DanfeSimulacaoPdfService danfeSimulacaoPdfService
+            DanfeSimulacaoPdfService danfeSimulacaoPdfService,
+            Contab360FeaturesProperties featuresProperties
     ) {
         this.notaFiscalRepository = notaFiscalRepository;
         this.cadastroDocumentoFiscalRepository = cadastroDocumentoFiscalRepository;
@@ -48,6 +53,13 @@ public class FiscalService {
         this.autorizacaoFiscalPort = autorizacaoFiscalPort;
         this.nfseEmissaoPort = nfseEmissaoPort;
         this.danfeSimulacaoPdfService = danfeSimulacaoPdfService;
+        this.featuresProperties = featuresProperties;
+    }
+
+    private void garantirModuloCertificadoDigital() {
+        if (!featuresProperties.isCertificadoDigital()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Modulo certificado digital desativado.");
+        }
     }
 
     @Transactional
@@ -135,21 +147,70 @@ public class FiscalService {
     }
 
     @Transactional
-    public CertificadoDigitalPedido venderCertificado(CertificadoDigitalPedido pedido, Usuario usuarioAtual) {
+    public CertificadoDigitalPedido venderCertificado(CertificadoDigitalCreateRequest req, Usuario usuarioAtual) {
+        garantirModuloCertificadoDigital();
         validarAcessoContador(usuarioAtual);
+        String doc = req.getDocumentoSolicitante() == null ? "" : req.getDocumentoSolicitante().replaceAll("\\D", "");
+        if (doc.length() != 11 && doc.length() != 14) {
+            throw new IllegalArgumentException("Documento do solicitante deve ter 11 (CPF) ou 14 (CNPJ) digitos.");
+        }
+        CertificadoDigitalPedido pedido = new CertificadoDigitalPedido();
+        pedido.setDocumentoSolicitante(doc);
+        pedido.setTitular(req.getTitular().trim());
+        pedido.setEmailContato(req.getEmailContato().trim());
+        pedido.setTipoCertificado(req.getTipoCertificado().trim());
+        pedido.setValidadeMeses(req.getValidadeMeses());
+        pedido.setDataVencimentoPrevista(req.getDataVencimentoPrevista());
+        if (req.getObservacaoInterna() != null && !req.getObservacaoInterna().isBlank()) {
+            pedido.setObservacaoInterna(req.getObservacaoInterna().trim());
+        }
+        if (req.getEmpresaId() != null) {
+            Empresa emp = empresaRepository
+                    .findById(req.getEmpresaId())
+                    .orElseThrow(() -> new IllegalArgumentException("Empresa nao encontrada."));
+            if (!emp.isAtivo()) {
+                throw new IllegalArgumentException("Empresa inativa. Reative-a antes de vincular o pedido.");
+            }
+            pedido.setEmpresa(emp);
+        }
+        pedido.setStatus(StatusCertificado.EM_ANALISE);
         return certificadoDigitalPedidoRepository.save(pedido);
     }
 
     @Transactional(readOnly = true)
     public List<CertificadoDigitalPedido> listarCertificados(Usuario usuarioAtual) {
+        garantirModuloCertificadoDigital();
         validarAutenticado(usuarioAtual);
-        return certificadoDigitalPedidoRepository.findAll();
+        return certificadoDigitalPedidoRepository.findAllWithEmpresaOrderByCriadoEmDesc();
+    }
+
+    @Transactional
+    public CertificadoDigitalPedido atualizarCertificado(
+            Long id,
+            CertificadoDigitalUpdateRequest req,
+            Usuario usuarioAtual
+    ) {
+        garantirModuloCertificadoDigital();
+        validarAcessoContador(usuarioAtual);
+        CertificadoDigitalPedido pedido = certificadoDigitalPedidoRepository
+                .findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Pedido de certificado nao encontrado."));
+        if (req.getStatus() != null) {
+            pedido.setStatus(req.getStatus());
+        }
+        if (req.getDataVencimentoPrevista() != null) {
+            pedido.setDataVencimentoPrevista(req.getDataVencimentoPrevista());
+        }
+        if (req.getObservacaoInterna() != null) {
+            pedido.setObservacaoInterna(req.getObservacaoInterna().isBlank() ? null : req.getObservacaoInterna().trim());
+        }
+        return certificadoDigitalPedidoRepository.save(pedido);
     }
 
     @Transactional
     public int gerarAlertasAutomaticos(Usuario usuarioAtual) {
         validarAcessoContador(usuarioAtual);
-        List<Empresa> empresas = empresaRepository.findAll();
+        List<Empresa> empresas = empresaRepository.findAllByAtivoTrue();
         int alertasCriados = 0;
         LocalDate hoje = LocalDate.now();
         LocalDate limite = hoje.plusDays(30);
@@ -179,6 +240,29 @@ public class FiscalService {
                 alertasCriados++;
             }
         }
+        if (featuresProperties.isCertificadoDigital()) {
+            List<CertificadoDigitalPedido> pedidos = certificadoDigitalPedidoRepository.findAllWithEmpresaOrderByCriadoEmDesc();
+            for (CertificadoDigitalPedido p : pedidos) {
+                if (p.getDataVencimentoPrevista() == null) {
+                    continue;
+                }
+                LocalDate d = p.getDataVencimentoPrevista();
+                if (!d.isBefore(hoje) && !d.isAfter(limite)) {
+                    AlertaFiscal alerta = new AlertaFiscal();
+                    alerta.setTipo(TipoAlertaFiscal.CERTIFICADO_PEDIDO);
+                    String ref = p.getDocumentoSolicitante();
+                    if (ref != null && ref.length() > 14) {
+                        ref = ref.substring(0, 14);
+                    }
+                    alerta.setDocumentoReferencia(ref != null && !ref.isBlank() ? ref : "00000000000000");
+                    alerta.setDataAlvo(d);
+                    alerta.setMensagem("Certificado digital (pedido): vencimento proximo — " + p.getTitular());
+                    alerta.setResolvido(false);
+                    alertaFiscalRepository.save(alerta);
+                    alertasCriados++;
+                }
+            }
+        }
         return alertasCriados;
     }
 
@@ -194,7 +278,8 @@ public class FiscalService {
         long totalNotas = notaFiscalRepository.count();
         long totalCadastros = cadastroDocumentoFiscalRepository.count();
         long totalCobrancas = cobrancaRepository.count();
-        long totalCertificados = certificadoDigitalPedidoRepository.count();
+        long totalCertificados =
+                featuresProperties.isCertificadoDigital() ? certificadoDigitalPedidoRepository.count() : 0L;
         long totalAlertasAbertos = alertaFiscalRepository.findByResolvidoFalseOrderByDataAlvoAsc().size();
 
         return new RelatorioEstrategicoResponse(

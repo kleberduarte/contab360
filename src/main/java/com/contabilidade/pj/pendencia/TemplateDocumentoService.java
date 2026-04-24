@@ -42,6 +42,9 @@ public class TemplateDocumentoService {
         Empresa empresa = empresaRepository
                 .findById(empresaId)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
+        if (!empresa.isAtivo()) {
+            throw new IllegalArgumentException("Empresa inativa. Reative-a antes de cadastrar template.");
+        }
 
         TemplateDocumento template = new TemplateDocumento();
         template.setEmpresa(empresa);

@@ -26,8 +26,8 @@ public class IaObservadoraService {
 
     @Transactional(readOnly = true)
     public IaObservadoraResponse analisar(Usuario usuarioAtual) {
-        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
-            throw new IllegalArgumentException("Apenas contador acessa a IA observadora.");
+        if (usuarioAtual.getPerfil() != PerfilUsuario.ADM) {
+            throw new IllegalArgumentException("Apenas perfil ADM acessa a IA observadora.");
         }
         Instant desde = Instant.now().minus(7, ChronoUnit.DAYS);
         List<AuditoriaEvento> eventos = auditoriaEventoRepository.findTop200ByCriadoEmAfterOrderByCriadoEmDesc(desde);

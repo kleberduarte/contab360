@@ -11,6 +11,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Garante usuários demo e vínculo com empresas. Se a 2ª empresa foi cadastrada depois da primeira subida,
@@ -32,15 +33,54 @@ public class AuthSeedConfig {
     CommandLineRunner seedUsuariosIniciais(
             UsuarioRepository usuarioRepository,
             EmpresaRepository empresaRepository,
-            AuthService authService
+            AuthService authService,
+            JdbcTemplate jdbcTemplate
     ) {
         return args -> {
+            garantirPerfilComAdm(jdbcTemplate);
             List<Empresa> empresas = empresaRepository.findAll(Sort.by(Sort.Direction.ASC, "id"));
 
+            syncAdmin(usuarioRepository, authService);
             syncContador(usuarioRepository, authService);
             syncCliente1(usuarioRepository, authService, empresas);
             syncCliente2(usuarioRepository, authService, empresas);
         };
+    }
+
+    private void garantirPerfilComAdm(JdbcTemplate jdbcTemplate) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE usuarios MODIFY COLUMN perfil ENUM('ADM','CONTADOR','CLIENTE') NOT NULL");
+        } catch (Exception ex) {
+            // Mantém startup resiliente em ambientes onde o tipo já suporta ADM ou usa outro dialeto.
+            log.debug("Não foi necessário/possível alterar enum de perfil automaticamente: {}", ex.getMessage());
+        }
+    }
+
+    private void syncAdmin(UsuarioRepository usuarioRepository, AuthService authService) {
+        Optional<Usuario> opt = usuarioRepository.findByEmail("admin@demo.com");
+        if (opt.isEmpty()) {
+            Usuario u = new Usuario();
+            u.setNome("Admin Demo");
+            u.setEmail("admin@demo.com");
+            u.setPerfil(PerfilUsuario.ADM);
+            definirSenhaDemo(u, true, authService);
+            usuarioRepository.save(u);
+            log.info("Usuário demo criado: admin@demo.com");
+        } else if (demoResetPasswords) {
+            Usuario u = opt.get();
+            boolean mudou = false;
+            if (u.getPerfil() != PerfilUsuario.ADM) {
+                u.setPerfil(PerfilUsuario.ADM);
+                mudou = true;
+            }
+            definirSenhaDemo(u, false, authService);
+            usuarioRepository.save(u);
+            if (mudou) {
+                log.info("Usuário demo atualizado para ADM: admin@demo.com");
+            } else {
+                log.debug("Senha demo atualizada: admin@demo.com");
+            }
+        }
     }
 
     private void syncContador(UsuarioRepository usuarioRepository, AuthService authService) {

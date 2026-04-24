@@ -59,7 +59,7 @@ public class PendenciaDocumentoService {
                     return competenciaMensalRepository.save(nova);
                 });
 
-        List<Empresa> empresas = empresaRepository.findAll();
+        List<Empresa> empresas = empresaRepository.findAllByAtivoTrue();
         int totalCriadas = 0;
 
         for (Empresa empresa : empresas) {

@@ -39,6 +39,10 @@ public class Empresa {
 
     private LocalDate vencimentoCertificadoMei;
 
+    /** Quando {@code false}, a empresa está desativada (exclusão lógica) e não entra em listagens operacionais. */
+    @Column(nullable = false)
+    private boolean ativo = true;
+
     public Long getId() {
         return id;
     }
@@ -93,5 +97,13 @@ public class Empresa {
 
     public void setVencimentoCertificadoMei(LocalDate vencimentoCertificadoMei) {
         this.vencimentoCertificadoMei = vencimentoCertificadoMei;
+    }
+
+    public boolean isAtivo() {
+        return ativo;
+    }
+
+    public void setAtivo(boolean ativo) {
+        this.ativo = ativo;
     }
 }

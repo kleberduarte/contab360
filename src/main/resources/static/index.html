@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#21c25e">
     <meta name="description" content="Cobrança de documentos, pendências e entregas em um só lugar.">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,14 +15,33 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/styles.css?v=20260327pwa">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css?v=20260328cert-form">
 </head>
 <body>
     <header id="app-header" class="header hidden">
         <div class="header__inner">
-            <div>
-                <h1 class="header__title">Contab360</h1>
+            <div class="header__brand-block">
+                <h1 class="header__title">
+                    <span class="brand-wordmark brand-wordmark--header" aria-label="Contab360">
+                        <span class="brand-wordmark__mark" aria-hidden="true">
+                            <svg class="brand-wordmark__svg" width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <defs>
+                                    <linearGradient id="brand-grad-header" x1="4" y1="4" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                                        <stop stop-color="#21c25e"/>
+                                        <stop offset="1" stop-color="#0fa96a"/>
+                                    </linearGradient>
+                                </defs>
+                                <rect x="2" y="2" width="40" height="40" rx="11" fill="url(#brand-grad-header)" opacity="0.14"/>
+                                <circle cx="22" cy="22" r="14" stroke="url(#brand-grad-header)" stroke-width="2.35" fill="none"/>
+                                <circle cx="22" cy="22" r="3.25" fill="url(#brand-grad-header)"/>
+                            </svg>
+                        </span>
+                        <span class="brand-wordmark__text">
+                            <span class="brand-wordmark__contab">Contab</span><span class="brand-wordmark__360">360</span>
+                        </span>
+                    </span>
+                </h1>
                 <p class="header__subtitle">Cobrança de documentos, pendências e entregas em um só lugar.</p>
             </div>
             <div id="session-info" class="header-session hidden">
@@ -55,7 +74,26 @@
     <main id="app-main" class="main">
         <section id="login-card" class="login-screen">
             <aside class="login-sidebar" aria-hidden="true">
-                <div class="login-sidebar__logo">Contab360</div>
+                <div class="login-sidebar__logo">
+                    <span class="brand-wordmark brand-wordmark--on-dark" aria-label="Contab360">
+                        <span class="brand-wordmark__mark brand-wordmark__mark--sm" aria-hidden="true">
+                            <svg class="brand-wordmark__svg" width="40" height="40" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <defs>
+                                    <linearGradient id="brand-grad-login" x1="4" y1="4" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                                        <stop stop-color="#b8f3cf"/>
+                                        <stop offset="1" stop-color="#7fe6b1"/>
+                                    </linearGradient>
+                                </defs>
+                                <rect x="2" y="2" width="40" height="40" rx="11" fill="#fff" fill-opacity="0.16"/>
+                                <circle cx="22" cy="22" r="14" stroke="url(#brand-grad-login)" stroke-width="2.35" fill="none"/>
+                                <circle cx="22" cy="22" r="3.25" fill="url(#brand-grad-login)"/>
+                            </svg>
+                        </span>
+                        <span class="brand-wordmark__text">
+                            <span class="brand-wordmark__contab">Contab</span><span class="brand-wordmark__360">360</span>
+                        </span>
+                    </span>
+                </div>
                 <p class="login-sidebar__tagline">No Contab360 você pode</p>
                 <ul class="login-sidebar__list">
                     <li>Centralizar pendências e documentos</li>
@@ -63,27 +101,32 @@
                 </ul>
             </aside>
             <div class="login-main">
-                <div class="login-panel__card">
-                    <h2 class="login-panel__title">Acessar o sistema</h2>
-                    <p class="login-panel__subtitle muted">Entre com seu e-mail e senha cadastrados.</p>
-                    <form id="form-login" class="form login-form">
-                        <label class="login-form__label">
-                            <span class="login-form__lbl">E-mail</span>
-                            <input type="email" id="login-email" required placeholder="seu-email@empresa.com" autocomplete="username">
-                        </label>
-                        <label class="login-form__label">
-                            <span class="login-form__lbl">Senha</span>
-                            <input type="password" id="login-senha" required placeholder="Digite sua senha" autocomplete="current-password">
-                        </label>
-                        <button type="submit" class="btn btn--login-primary">Entrar</button>
-                    </form>
-                    <p id="login-feedback" class="feedback login-feedback" role="status"></p>
-                </div>
+                <div id="login-react-root"></div>
             </div>
         </section>
 
         <section id="app-shell" class="app-shell hidden">
             <aside class="sidebar">
+                <div class="sidebar__brand" aria-hidden="true">
+                    <span class="brand-wordmark brand-wordmark--sidebar">
+                        <span class="brand-wordmark__mark brand-wordmark__mark--xs" aria-hidden="true">
+                            <svg class="brand-wordmark__svg" width="32" height="32" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <defs>
+                                    <linearGradient id="brand-grad-sidebar" x1="4" y1="4" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                                        <stop stop-color="#21c25e"/>
+                                        <stop offset="1" stop-color="#0fa96a"/>
+                                    </linearGradient>
+                                </defs>
+                                <rect x="2" y="2" width="40" height="40" rx="11" fill="url(#brand-grad-sidebar)" opacity="0.11"/>
+                                <circle cx="22" cy="22" r="14" stroke="url(#brand-grad-sidebar)" stroke-width="2.35" fill="none"/>
+                                <circle cx="22" cy="22" r="3.25" fill="url(#brand-grad-sidebar)"/>
+                            </svg>
+                        </span>
+                        <span class="brand-wordmark__text">
+                            <span class="brand-wordmark__contab">Contab</span><span class="brand-wordmark__360">360</span>
+                        </span>
+                    </span>
+                </div>
                 <h2 class="sidebar__title">Menu</h2>
                 <nav class="sidebar__nav">
                     <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-contador-dashboard">Dashboard</button>
@@ -96,7 +139,7 @@
                     <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-notas">Notas Fiscais</button>
                     <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-cadastros">CPF/CNPJ</button>
                     <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-cobrancas">Cobranças</button>
-                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-certificados">Certificados</button>
+                    <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-certificados" data-feature="certificadoDigital">Certificados</button>
                     <button type="button" class="sidebar__item" data-perfil="CONTADOR" data-target="screen-fiscal-alertas">Alertas e Relatórios</button>
 
                     <button type="button" class="sidebar__item" data-perfil="CLIENTE" data-target="screen-cliente-dashboard">Portal</button>
@@ -118,6 +161,10 @@
                                 <span class="dashboard-hero__comp-label">Competência</span>
                                 <span class="dashboard-badge" id="dashboard-contador-competencia">—</span>
                             </span>
+                        </p>
+                        <p class="dashboard-hero__note muted">
+                            Os números de pendências refletem a competência do mês (inclui competências já arquivadas quando tudo foi validado).
+                            O gráfico <strong>Notas fiscais (por tipo)</strong> usa o cadastro do módulo fiscal (radar de notas), não só arquivos validados na IA.
                         </p>
                     </div>
                 </header>
@@ -144,20 +191,69 @@
                 </div>
             </section>
 
-            <section id="screen-empresas" class="card app-screen hidden">
-                <h2>Empresas cadastradas e novo cadastro</h2>
-                <ul id="lista-empresas" class="lista"></ul>
-                <p id="empresas-empty" class="muted hidden">Nenhuma empresa ainda.</p>
-                <form id="form-empresa" class="form">
-                    <label>CNPJ (14 dígitos)<input type="text" id="cnpj" maxlength="18" inputmode="numeric" autocomplete="off" required></label>
-                    <label>Razão social<input type="text" id="razaoSocial" required></label>
-                    <label>CPF responsável (11 dígitos)<input type="text" id="cpfResponsavel" maxlength="14" inputmode="numeric" autocomplete="off"></label>
-                    <label class="checkbox"><input type="checkbox" id="mei"> Empresa MEI</label>
-                    <label>Vencimento DAS (MEI)<input type="date" id="vencimentoDas"></label>
-                    <label>Vencimento certificado MEI<input type="date" id="vencimentoCertificadoMei"></label>
-                    <button type="submit" class="btn">Cadastrar</button>
-                </form>
-                <p id="form-feedback" class="feedback"></p>
+            <section id="screen-empresas" class="card app-screen empresas-screen hidden">
+                <header class="empresas-hero">
+                    <p class="empresas-hero__eyebrow">Cadastro</p>
+                    <h2 class="empresas-hero__title">Empresas</h2>
+                </header>
+
+                <div class="empresas-layout">
+                    <div class="empresas-panel empresas-panel--form">
+                        <h3 id="empresas-form-panel-title" class="empresas-panel__title">Novo cadastro</h3>
+                        <p class="empresas-panel__hint muted">Preencha os dados da empresa. Campos de MEI só se aplicam quando marcado.</p>
+                        <form id="form-empresa" class="form form--empresas">
+                            <label class="empresas-field">CNPJ (14 dígitos)<input type="text" id="cnpj" maxlength="18" inputmode="numeric" autocomplete="off" required placeholder="00.000.000/0000-00"></label>
+                            <label class="empresas-field">Razão social<input type="text" id="razaoSocial" required placeholder="Nome empresarial"></label>
+                            <label class="empresas-field empresas-field--full">CPF responsável (11 dígitos)<input type="text" id="cpfResponsavel" maxlength="14" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00"></label>
+                            <label class="checkbox empresas-field empresas-field--full"><input type="checkbox" id="mei"> Empresa MEI</label>
+                            <label class="empresas-field">Vencimento DAS (MEI)<input type="date" id="vencimentoDas"></label>
+                            <label class="empresas-field">Vencimento certificado MEI<input type="date" id="vencimentoCertificadoMei"></label>
+                            <div class="empresas-form-row empresas-form-row--actions">
+                                <button type="submit" class="btn" id="btn-empresa-submit">Cadastrar empresa</button>
+                                <button type="button" class="btn btn--ghost hidden" id="btn-empresa-cancelar-edicao">Cancelar edição</button>
+                                <button type="button" class="btn btn--ghost btn--empresa-excluir hidden" id="btn-empresa-excluir">Desativar empresa</button>
+                            </div>
+                        </form>
+                        <p id="form-feedback" class="feedback"></p>
+                    </div>
+
+                    <div class="empresas-panel empresas-panel--list">
+                        <div class="empresas-panel__head">
+                            <h3 class="empresas-panel__title">Empresas cadastradas</h3>
+                            <span id="empresas-count" class="empresas-count hidden" aria-live="polite">0</span>
+                        </div>
+                        <label class="empresas-search-wrap">
+                            <span class="empresas-search-label">Buscar</span>
+                            <input type="search" id="empresas-busca" class="empresas-search" placeholder="Razão social ou CNPJ…" autocomplete="off" enterkeyhint="search">
+                        </label>
+                        <label class="empresas-inativas-check">
+                            <input type="checkbox" id="empresas-incluir-inativas">
+                            Mostrar empresas inativas
+                        </label>
+                        <p id="empresas-lista-hint" class="empresas-lista-hint muted" aria-live="polite"></p>
+                        <div id="empresas-table-wrap" class="empresas-table-wrap hidden">
+                            <table class="empresas-table" aria-describedby="empresas-table-caption">
+                                <caption id="empresas-table-caption" class="visually-hidden">Lista de empresas com razão social, CNPJ resumido, MEI e ações</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Razão social</th>
+                                        <th scope="col">CNPJ</th>
+                                        <th scope="col">MEI</th>
+                                        <th scope="col" class="empresas-table__th-acoes">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lista-empresas"></tbody>
+                            </table>
+                        </div>
+                        <div id="empresas-busca-vazio" class="empresas-busca-vazio hidden" role="status">
+                            <p class="muted">Nenhuma empresa encontrada para esta busca.</p>
+                        </div>
+                        <div id="empresas-empty" class="empresas-empty hidden" role="status">
+                            <p class="empresas-empty__title">Nenhuma empresa ainda</p>
+                            <p class="empresas-empty__text muted">Use o formulário de novo cadastro para incluir a primeira empresa.</p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section id="screen-templates" class="card app-screen hidden">
@@ -321,15 +417,65 @@
 
             <section id="screen-fiscal-certificados" class="card app-screen hidden">
                 <h2>Venda de certificado digital</h2>
-                <form id="form-fiscal-certificado" class="form">
-                    <label>Documento solicitante<input type="text" id="cert-doc" required></label>
-                    <label>Titular<input type="text" id="cert-titular" required></label>
-                    <label>Email contato<input type="email" id="cert-email" required></label>
-                    <label>Tipo certificado<input type="text" id="cert-tipo" placeholder="A1 ou A3" required></label>
-                    <label>Validade (meses)<input type="number" id="cert-validade" min="1" required></label>
-                    <button type="submit" class="btn">Registrar venda</button>
-                </form>
-                <p id="cert-feedback" class="feedback"></p>
+                <p id="cert-modulo-off" class="muted hidden">O módulo de certificado digital está desativado. Para habilitar em produção, defina <code>contab360.features.certificado-digital=true</code> no ambiente.</p>
+                <div id="cert-modulo-on" class="hidden">
+                    <p class="cert-lead muted">Registre pedidos de certificado (e-CPF/e-CNPJ), vincule à empresa do cadastro, acompanhe status e vencimento. A emissão na Autoridade Certificadora continua sendo feita fora do sistema.</p>
+                    <form id="form-fiscal-certificado" class="form form--certificados" autocomplete="off">
+                        <label class="cert-field">
+                            <span class="cert-field__label">Documento solicitante (CPF ou CNPJ)</span>
+                            <input type="text" id="cert-doc" required placeholder="Somente números" inputmode="numeric" autocomplete="off">
+                        </label>
+                        <label class="cert-field">
+                            <span class="cert-field__label">Titular</span>
+                            <input type="text" id="cert-titular" required placeholder="Nome no certificado" autocomplete="name">
+                        </label>
+                        <label class="cert-field">
+                            <span class="cert-field__label">E-mail de contato</span>
+                            <input type="email" id="cert-email" required placeholder="email@empresa.com" autocomplete="email">
+                        </label>
+                        <label class="cert-field">
+                            <span class="cert-field__label">Empresa vinculada <span class="cert-field__opt">(opcional)</span></span>
+                            <select id="cert-empresa-id"><option value="">— Nenhuma —</option></select>
+                        </label>
+                        <label class="cert-field cert-field--third">
+                            <span class="cert-field__label">Tipo de certificado</span>
+                            <input type="text" id="cert-tipo" placeholder="Ex.: A1 ou A3" required>
+                        </label>
+                        <label class="cert-field cert-field--third">
+                            <span class="cert-field__label">Validade (meses)</span>
+                            <input type="number" id="cert-validade" min="1" placeholder="12" required>
+                        </label>
+                        <label class="cert-field cert-field--third">
+                            <span class="cert-field__label">Vencimento previsto</span>
+                            <input type="date" id="cert-venc-previsto" title="Usado em alertas automáticos (próximos 30 dias)">
+                        </label>
+                        <label class="cert-field cert-field--full cert-field--textarea">
+                            <span class="cert-field__label">Observações internas</span>
+                            <textarea id="cert-obs" rows="3" placeholder="Notas para a equipe (não visíveis ao cliente)"></textarea>
+                        </label>
+                        <div class="cert-form-actions">
+                            <button type="submit" class="btn">Registrar pedido</button>
+                        </div>
+                    </form>
+                    <p id="cert-feedback" class="feedback"></p>
+                    <h3 class="cert-lista-titulo">Pedidos recentes</h3>
+                    <div class="cert-table-wrap">
+                        <table class="cert-table" id="cert-tabela">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Titular</th>
+                                    <th>Empresa</th>
+                                    <th>Tipo</th>
+                                    <th>Venc.</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cert-tbody"></tbody>
+                        </table>
+                    </div>
+                    <p id="cert-lista-vazio" class="muted hidden">Nenhum pedido registrado ainda.</p>
+                </div>
             </section>
 
             <section id="screen-fiscal-alertas" class="card app-screen hidden">
@@ -461,6 +607,20 @@
         </div>
     </div>
 
+    <div id="modal-app-dialog" class="modal-backdrop modal-app-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="modal-app-dialog-title" aria-describedby="modal-app-dialog-message" aria-hidden="true">
+        <div class="modal modal--app-dialog">
+            <h3 id="modal-app-dialog-title">Aviso</h3>
+            <p id="modal-app-dialog-message" class="modal-app-dialog__message"></p>
+            <div id="modal-app-dialog-actions-alert" class="modal-actions hidden">
+                <button type="button" class="btn" id="btn-app-dialog-alert-ok">OK</button>
+            </div>
+            <div id="modal-app-dialog-actions-confirm" class="modal-actions hidden">
+                <button type="button" class="btn btn--ghost" id="btn-app-dialog-cancel">Cancelar</button>
+                <button type="button" class="btn" id="btn-app-dialog-confirm">OK</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-dados-extraidos" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-dados-extraidos-title">
         <div class="modal modal--wide">
             <h3 id="modal-dados-extraidos-title">Dados extraídos do documento</h3>
@@ -478,6 +638,71 @@
         </div>
     </div>
 
-    <script src="/js/app.js?v=20260327header"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script>
+        (function () {
+            const rootEl = document.getElementById("login-react-root");
+            if (!rootEl || !window.React || !window.ReactDOM) return;
+            const e = React.createElement;
+
+            function IconEmail() {
+                return e("svg", { viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+                    e("rect", { x: "3.75", y: "5.75", width: "16.5", height: "12.5", rx: "2", stroke: "currentColor", strokeWidth: "1.6" }),
+                    e("path", { d: "M4.75 7L12 12.5L19.25 7", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }));
+            }
+
+            function IconSenha() {
+                return e("svg", { viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+                    e("rect", { x: "4.75", y: "10.25", width: "14.5", height: "8.75", rx: "2", stroke: "currentColor", strokeWidth: "1.6" }),
+                    e("path", { d: "M8.5 10.25V8.75C8.5 6.82 10.07 5.25 12 5.25C13.93 5.25 15.5 6.82 15.5 8.75V10.25", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round" }));
+            }
+
+            function IconEye() {
+                return e("svg", { viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg" },
+                    e("path", { d: "M2.75 12C2.75 12 6.25 6.75 12 6.75C17.75 6.75 21.25 12 21.25 12C21.25 12 17.75 17.25 12 17.25C6.25 17.25 2.75 12 2.75 12Z", stroke: "currentColor", strokeWidth: "1.6" }),
+                    e("circle", { cx: "12", cy: "12", r: "2.4", stroke: "currentColor", strokeWidth: "1.6" }));
+            }
+
+            function LoginForm() {
+                const state = React.useState(false);
+                const mostrarSenha = state[0];
+                const setMostrarSenha = state[1];
+
+                return e("div", { className: "login-panel__card login-panel__card--react" },
+                    e("div", { className: "login-panel__top" },
+                        e("h2", { className: "login-panel__title" }, "Acessar o sistema")
+                    ),
+                    e("form", { id: "form-login", className: "form login-form" },
+                        e("label", { className: "login-form__label" },
+                            e("span", { className: "login-form__lbl" }, "E-mail"),
+                            e("span", { className: "login-input-wrap" },
+                                e("span", { className: "login-input-icon", "aria-hidden": "true" }, e(IconEmail)),
+                                e("input", { type: "email", id: "login-email", required: true, autoComplete: "username" })
+                            )
+                        ),
+                        e("label", { className: "login-form__label" },
+                            e("span", { className: "login-form__lbl" }, "Senha"),
+                            e("span", { className: "login-input-wrap" },
+                                e("span", { className: "login-input-icon", "aria-hidden": "true" }, e(IconSenha)),
+                                e("input", { type: mostrarSenha ? "text" : "password", id: "login-senha", required: true, autoComplete: "current-password" }),
+                                e("button", {
+                                    type: "button",
+                                    className: "login-password-toggle",
+                                    "aria-label": mostrarSenha ? "Ocultar senha" : "Mostrar senha",
+                                    onClick: function () { setMostrarSenha(!mostrarSenha); }
+                                }, e(IconEye))
+                            )
+                        ),
+                        e("button", { type: "submit", className: "btn btn--login-primary" }, "Entrar")
+                    ),
+                    e("p", { id: "login-feedback", className: "feedback login-feedback", role: "status" })
+                );
+            }
+
+            ReactDOM.createRoot(rootEl).render(e(LoginForm));
+        })();
+    </script>
+    <script src="/js/app.js?v=20260328cert-mod"></script>
 </body>
 </html>

@@ -19,7 +19,10 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String path = request.getRequestURI();
-        if (!path.startsWith("/api/") || path.equals("/api/health") || path.equals("/api/auth/login")) {
+        if (!path.startsWith("/api/")
+                || path.equals("/api/health")
+                || path.equals("/api/features")
+                || path.equals("/api/auth/login")) {
             return true;
         }
 

@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -79,7 +80,7 @@ public class FiscalController {
     }
 
     @PostMapping("/certificados")
-    public ResponseEntity<CertificadoDigitalPedido> venderCertificado(@Valid @RequestBody CertificadoDigitalPedido pedido) {
+    public ResponseEntity<CertificadoDigitalPedido> venderCertificado(@Valid @RequestBody CertificadoDigitalCreateRequest pedido) {
         CertificadoDigitalPedido salvo = fiscalService.venderCertificado(pedido, AuthContext.get());
         return ResponseEntity.status(HttpStatus.CREATED).body(salvo);
     }
@@ -87,6 +88,14 @@ public class FiscalController {
     @GetMapping("/certificados")
     public List<CertificadoDigitalPedido> listarCertificados() {
         return fiscalService.listarCertificados(AuthContext.get());
+    }
+
+    @PatchMapping("/certificados/{id}")
+    public CertificadoDigitalPedido atualizarCertificado(
+            @PathVariable Long id,
+            @RequestBody CertificadoDigitalUpdateRequest body
+    ) {
+        return fiscalService.atualizarCertificado(id, body, AuthContext.get());
     }
 
     @PostMapping("/cobrancas")

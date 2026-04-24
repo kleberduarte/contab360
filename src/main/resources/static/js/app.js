@@ -1,6 +1,7 @@
 (function () {
     const storageKey = "contabpj_session";
     let session = null;
+    let features = { certificadoDigital: false };
 
     const loginCard = document.getElementById("login-card");
     const appHeader = document.getElementById("app-header");
@@ -19,13 +20,24 @@
     const sidebarItems = Array.from(document.querySelectorAll(".sidebar__item"));
     const appScreens = Array.from(document.querySelectorAll(".app-screen"));
 
-    const loginForm = document.getElementById("form-login");
     const loginFeedback = document.getElementById("login-feedback");
 
     const empresaForm = document.getElementById("form-empresa");
     const empresaFeedback = document.getElementById("form-feedback");
     const listaEmpresas = document.getElementById("lista-empresas");
     const empresasEmpty = document.getElementById("empresas-empty");
+    const empresasTableWrap = document.getElementById("empresas-table-wrap");
+    const empresasCount = document.getElementById("empresas-count");
+    const empresasBuscaInput = document.getElementById("empresas-busca");
+    const empresasListaHint = document.getElementById("empresas-lista-hint");
+    const empresasBuscaVazio = document.getElementById("empresas-busca-vazio");
+    const btnEmpresaSubmit = document.getElementById("btn-empresa-submit");
+    const btnEmpresaCancelar = document.getElementById("btn-empresa-cancelar-edicao");
+    const btnEmpresaExcluir = document.getElementById("btn-empresa-excluir");
+    const empresasFormPanelTitle = document.getElementById("empresas-form-panel-title");
+    const empresasIncluirInativasEl = document.getElementById("empresas-incluir-inativas");
+    let empresasCache = [];
+    let empresaEditandoId = null;
 
     const templateForm = document.getElementById("form-template");
     const templateEmpresaEl = document.getElementById("template-empresa");
@@ -105,6 +117,20 @@
     const iaObsEventos = document.getElementById("ia-obs-eventos");
     const btnAtualizarIaObs = document.getElementById("btn-atualizar-ia-obs");
 
+    const modalAppDialog = document.getElementById("modal-app-dialog");
+    const modalAppDialogTitle = document.getElementById("modal-app-dialog-title");
+    const modalAppDialogMessage = document.getElementById("modal-app-dialog-message");
+    const modalAppDialogActionsAlert = document.getElementById("modal-app-dialog-actions-alert");
+    const modalAppDialogActionsConfirm = document.getElementById("modal-app-dialog-actions-confirm");
+    const btnAppDialogAlertOk = document.getElementById("btn-app-dialog-alert-ok");
+    const btnAppDialogCancel = document.getElementById("btn-app-dialog-cancel");
+    const btnAppDialogConfirm = document.getElementById("btn-app-dialog-confirm");
+
+    let appDialogResolve = null;
+    let appDialogMode = null;
+    let appDialogOnKey = null;
+    let appDialogPreviousFocus = null;
+
     function somenteDigitos(value) {
         return (value || "").replace(/\D/g, "");
     }
@@ -116,6 +142,13 @@
         if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
         if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
         return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+    }
+
+    /** Lista/tabela: oculta filial e dígitos verificadores (tooltip com CNPJ completo). */
+    function mascararCnpjLista(cnpj) {
+        const d = somenteDigitos(cnpj).slice(0, 14);
+        if (d.length !== 14) return "—";
+        return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/****-**`;
     }
 
     function formatarCpf(value) {
@@ -169,6 +202,120 @@
         el.textContent = text || "";
         el.className = "feedback";
         if (tipo) el.classList.add(tipo);
+    }
+
+    function closeAppDialog(value) {
+        if (!modalAppDialog) return;
+        const mode = appDialogMode;
+        const fn = appDialogResolve;
+        appDialogResolve = null;
+        appDialogMode = null;
+        if (appDialogOnKey) {
+            document.removeEventListener("keydown", appDialogOnKey);
+            appDialogOnKey = null;
+        }
+        modalAppDialog.classList.add("hidden");
+        modalAppDialog.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-app-dialog-open");
+        const prev = appDialogPreviousFocus;
+        appDialogPreviousFocus = null;
+        if (prev && typeof prev.focus === "function") {
+            try {
+                prev.focus();
+            } catch (_) {
+                /* ignore */
+            }
+        }
+        if (typeof fn !== "function") return;
+        if (mode === "alert") fn();
+        else fn(!!value);
+    }
+
+    function openAppDialogSetup(mode, title, message, opts) {
+        const o = opts || {};
+        const confirmLabel = o.confirmLabel != null ? o.confirmLabel : "OK";
+        const cancelLabel = o.cancelLabel != null ? o.cancelLabel : "Cancelar";
+        const danger = !!o.danger;
+        if (modalAppDialogTitle) modalAppDialogTitle.textContent = title || (mode === "alert" ? "Aviso" : "Confirmação");
+        if (modalAppDialogMessage) modalAppDialogMessage.textContent = message || "";
+        if (mode === "alert") {
+            if (modalAppDialogActionsAlert) modalAppDialogActionsAlert.classList.remove("hidden");
+            if (modalAppDialogActionsConfirm) modalAppDialogActionsConfirm.classList.add("hidden");
+        } else {
+            if (modalAppDialogActionsAlert) modalAppDialogActionsAlert.classList.add("hidden");
+            if (modalAppDialogActionsConfirm) modalAppDialogActionsConfirm.classList.remove("hidden");
+            if (btnAppDialogConfirm) {
+                btnAppDialogConfirm.textContent = confirmLabel;
+                btnAppDialogConfirm.classList.toggle("btn--danger", danger);
+            }
+            if (btnAppDialogCancel) btnAppDialogCancel.textContent = cancelLabel;
+        }
+        appDialogMode = mode;
+        appDialogPreviousFocus = document.activeElement;
+        modalAppDialog.classList.remove("hidden");
+        modalAppDialog.removeAttribute("aria-hidden");
+        document.body.classList.add("modal-app-dialog-open");
+        appDialogOnKey = (e) => {
+            if (e.key !== "Escape") return;
+            e.preventDefault();
+            if (mode === "alert") closeAppDialog();
+            else closeAppDialog(false);
+        };
+        document.addEventListener("keydown", appDialogOnKey);
+        requestAnimationFrame(() => {
+            if (mode === "alert" && btnAppDialogAlertOk) btnAppDialogAlertOk.focus();
+            else if (mode === "confirm") {
+                const focusEl = danger && btnAppDialogCancel ? btnAppDialogCancel : btnAppDialogConfirm;
+                if (focusEl) focusEl.focus();
+            }
+        });
+    }
+
+    /**
+     * Diálogo de aviso (substitui window.alert).
+     * @param {string} message
+     * @param {string} [title]
+     * @returns {Promise<void>}
+     */
+    function appAlert(message, title) {
+        return new Promise((resolve) => {
+            if (!modalAppDialog || !modalAppDialogTitle) {
+                window.alert(message);
+                resolve();
+                return;
+            }
+            appDialogResolve = resolve;
+            openAppDialogSetup("alert", title || "Aviso", message, {});
+        });
+    }
+
+    /**
+     * Diálogo de confirmação (substitui window.confirm).
+     * @param {string} message
+     * @param {string} [title]
+     * @param {{ confirmLabel?: string, cancelLabel?: string, danger?: boolean }} [opts]
+     * @returns {Promise<boolean>}
+     */
+    function appConfirm(message, title, opts) {
+        return new Promise((resolve) => {
+            if (!modalAppDialog || !modalAppDialogTitle) {
+                resolve(window.confirm(message));
+                return;
+            }
+            appDialogResolve = resolve;
+            openAppDialogSetup("confirm", title || "Confirmação", message, opts || {});
+        });
+    }
+
+    if (modalAppDialog && btnAppDialogAlertOk && btnAppDialogCancel && btnAppDialogConfirm) {
+        btnAppDialogAlertOk.addEventListener("click", () => closeAppDialog());
+        btnAppDialogCancel.addEventListener("click", () => closeAppDialog(false));
+        btnAppDialogConfirm.addEventListener("click", () => closeAppDialog(true));
+        modalAppDialog.addEventListener("click", (e) => {
+            if (e.target !== modalAppDialog) return;
+            if (appDialogMode === "alert") closeAppDialog();
+            else closeAppDialog(false);
+        });
     }
 
     function iniciaisDoNome(nome) {
@@ -228,40 +375,278 @@
             const allowed = item.dataset.perfil === session.perfil;
             item.classList.toggle("hidden", !allowed);
         });
+        applyFeatureFlags();
         const initialScreen = session.perfil === "CONTADOR" ? "screen-contador-dashboard" : "screen-cliente-dashboard";
         navigateToScreen(initialScreen);
         refreshDocumentosValidadosIfNeeded(initialScreen);
         refreshDashboardIfNeeded(initialScreen);
         refreshPendenciasContadorIfNeeded(initialScreen);
+        refreshPendenciasClienteIfNeeded(initialScreen);
+    }
+
+    function applyFeatureFlags() {
+        const certOn = features.certificadoDigital === true;
+        const offEl = document.getElementById("cert-modulo-off");
+        const onEl = document.getElementById("cert-modulo-on");
+        if (offEl) {
+            offEl.classList.toggle("hidden", certOn);
+        }
+        if (onEl) {
+            onEl.classList.toggle("hidden", !certOn);
+        }
+        if (!session) {
+            return;
+        }
+        document.querySelectorAll(".sidebar__item[data-feature]").forEach((el) => {
+            const allowed = el.dataset.perfil === session.perfil;
+            let featOk = true;
+            if (el.dataset.feature === "certificadoDigital") {
+                featOk = features.certificadoDigital === true;
+            }
+            el.classList.toggle("hidden", !allowed || !featOk);
+        });
+    }
+
+    async function loadFeatures() {
+        try {
+            const r = await fetch("/api/features");
+            if (r.ok) {
+                const j = await r.json();
+                features = { certificadoDigital: false, ...j };
+            }
+        } catch (_) {
+            /* ignore */
+        }
+        applyFeatureFlags();
     }
 
     function navigateToScreen(screenId) {
+        if (screenId === "screen-fiscal-certificados" && features.certificadoDigital !== true) {
+            screenId = "screen-contador-dashboard";
+        }
         appScreens.forEach((screen) => {
             screen.classList.toggle("hidden", screen.id !== screenId);
         });
         sidebarItems.forEach((item) => {
             item.classList.toggle("active", item.dataset.target === screenId);
         });
+        if (screenId === "screen-fiscal-certificados" && features.certificadoDigital === true) {
+            popularCertEmpresaSelect();
+            void carregarListaCertificados();
+        }
+    }
+
+    function empresaEstaAtiva(e) {
+        return e == null || e.ativo !== false;
     }
 
     function renderEmpresas(empresas) {
-        listaEmpresas.innerHTML = "";
+        empresasCache = Array.isArray(empresas) ? empresas.slice() : [];
+        const ativas = empresasCache.filter(empresaEstaAtiva);
         templateEmpresaEl.innerHTML = "";
-        if (!empresas.length) {
-            empresasEmpty.classList.remove("hidden");
-            return;
-        }
-        empresasEmpty.classList.add("hidden");
-        empresas.forEach((e) => {
-            const li = document.createElement("li");
-            li.textContent = `${formatarCnpj(e.cnpj)} — ${e.razaoSocial}`;
-            listaEmpresas.appendChild(li);
+        ativas.forEach((e) => {
             const op = document.createElement("option");
             op.value = e.id;
             op.textContent = `${e.razaoSocial} (${formatarCnpj(e.cnpj)})`;
             templateEmpresaEl.appendChild(op);
         });
-        popularSelectDocsValidadosEmpresa(empresas);
+        popularSelectDocsValidadosEmpresa(ativas);
+        popularCertEmpresaSelect();
+        renderEmpresasTabelaUI();
+    }
+
+    function popularCertEmpresaSelect() {
+        const sel = document.getElementById("cert-empresa-id");
+        if (!sel) {
+            return;
+        }
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">— Nenhuma —</option>';
+        empresasCache.filter(empresaEstaAtiva).forEach((e) => {
+            const op = document.createElement("option");
+            op.value = e.id;
+            op.textContent = `${e.razaoSocial} (${formatarCnpj(e.cnpj)})`;
+            sel.appendChild(op);
+        });
+        if (prev && [...sel.options].some((o) => o.value === String(prev))) {
+            sel.value = prev;
+        }
+    }
+
+    function empresasLinhasVisiveis() {
+        const q = (empresasBuscaInput && empresasBuscaInput.value ? empresasBuscaInput.value : "").trim();
+        const qLower = q.toLowerCase();
+        const qDigits = somenteDigitos(q);
+        if (!empresasCache.length) return [];
+        if (!q) {
+            const sorted = [...empresasCache].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+            return sorted.slice(0, 1);
+        }
+        return empresasCache.filter((e) => {
+            const nome = (e.razaoSocial || "").toLowerCase();
+            const cnpj = somenteDigitos(e.cnpj || "");
+            if (nome.includes(qLower)) return true;
+            if (qDigits.length >= 1 && cnpj.includes(qDigits)) return true;
+            return false;
+        });
+    }
+
+    function renderEmpresasTabelaUI() {
+        listaEmpresas.innerHTML = "";
+        if (!empresasCache.length) {
+            empresasEmpty.classList.remove("hidden");
+            if (empresasTableWrap) empresasTableWrap.classList.add("hidden");
+            if (empresasBuscaVazio) empresasBuscaVazio.classList.add("hidden");
+            if (empresasCount) {
+                empresasCount.classList.add("hidden");
+                empresasCount.textContent = "0";
+            }
+            if (empresasListaHint) empresasListaHint.textContent = "";
+            return;
+        }
+        empresasEmpty.classList.add("hidden");
+        if (empresasCount) {
+            empresasCount.textContent = String(empresasCache.length);
+            empresasCount.classList.remove("hidden");
+        }
+        const linhas = empresasLinhasVisiveis();
+        const temBusca = (empresasBuscaInput && empresasBuscaInput.value ? empresasBuscaInput.value : "").trim().length > 0;
+        if (empresasListaHint) {
+            if (!temBusca) {
+                const incluirInativas = empresasIncluirInativasEl && empresasIncluirInativasEl.checked;
+                let base =
+                    empresasCache.length > 1
+                        ? "Mostrando apenas a última empresa cadastrada. Use a busca para localizar as demais."
+                        : "Única empresa cadastrada.";
+                if (incluirInativas) {
+                    base = "Listagem inclui empresas inativas. " + base;
+                }
+                empresasListaHint.textContent = base;
+            } else {
+                empresasListaHint.textContent =
+                    linhas.length === 1 ? "1 resultado encontrado." : `${linhas.length} resultados encontrados.`;
+            }
+        }
+        if (!linhas.length) {
+            if (empresasTableWrap) empresasTableWrap.classList.add("hidden");
+            if (empresasBuscaVazio) empresasBuscaVazio.classList.toggle("hidden", !temBusca);
+            return;
+        }
+        if (empresasBuscaVazio) empresasBuscaVazio.classList.add("hidden");
+        if (empresasTableWrap) empresasTableWrap.classList.remove("hidden");
+        linhas.forEach((e) => {
+            const tr = document.createElement("tr");
+            const cnpjFmt = formatarCnpj(e.cnpj);
+            const meiCell = e.mei
+                ? '<span class="empresas-badge empresas-badge--mei">Sim</span>'
+                : '<span class="empresas-badge empresas-badge--nao">Não</span>';
+            const idAttr = String(e.id);
+            const ativa = empresaEstaAtiva(e);
+            const nomeHtml = escapeHtml(e.razaoSocial)
+                + (ativa ? "" : ' <span class="empresas-badge empresas-badge--inativa">Inativa</span>');
+            const acoesHtml = ativa
+                ? `<button type="button" class="empresas-acao empresas-acao--edit" data-empresa-editar="${idAttr}">Editar</button>`
+                    + `<button type="button" class="empresas-acao empresas-acao--del" data-empresa-excluir="${idAttr}">Desativar</button>`
+                : `<button type="button" class="empresas-acao empresas-acao--reativar" data-empresa-reativar="${idAttr}">Reativar</button>`;
+            tr.innerHTML =
+                `<td class="empresas-table__nome">${nomeHtml}</td>`
+                + `<td class="empresas-table__cnpj" title="CNPJ completo: ${escapeHtml(cnpjFmt)}">${escapeHtml(mascararCnpjLista(e.cnpj))}</td>`
+                + `<td class="empresas-table__mei">${meiCell}</td>`
+                + `<td class="empresas-table__acoes">${acoesHtml}</td>`;
+            listaEmpresas.appendChild(tr);
+        });
+    }
+
+    function preencherFormularioEmpresa(e) {
+        document.getElementById("cnpj").value = formatarCnpj(e.cnpj);
+        document.getElementById("razaoSocial").value = e.razaoSocial || "";
+        document.getElementById("cpfResponsavel").value = e.cpfResponsavel ? formatarCpf(e.cpfResponsavel) : "";
+        document.getElementById("mei").checked = !!e.mei;
+        const vd = document.getElementById("vencimentoDas");
+        const vc = document.getElementById("vencimentoCertificadoMei");
+        if (vd) vd.value = e.vencimentoDas || "";
+        if (vc) vc.value = e.vencimentoCertificadoMei || "";
+    }
+
+    function limparEdicaoEmpresa() {
+        empresaEditandoId = null;
+        empresaForm.reset();
+        if (btnEmpresaSubmit) btnEmpresaSubmit.textContent = "Cadastrar empresa";
+        if (btnEmpresaCancelar) btnEmpresaCancelar.classList.add("hidden");
+        if (btnEmpresaExcluir) btnEmpresaExcluir.classList.add("hidden");
+        if (empresasFormPanelTitle) empresasFormPanelTitle.textContent = "Novo cadastro";
+    }
+
+    function iniciarEdicaoEmpresaNoFormulario(e) {
+        if (!e || e.id == null) return;
+        if (!empresaEstaAtiva(e)) {
+            setFeedback(
+                empresaFeedback,
+                "Esta empresa está inativa. Marque “Mostrar empresas inativas”, use Reativar na tabela e depois edite.",
+                "err"
+            );
+            return;
+        }
+        empresaEditandoId = Number(e.id);
+        preencherFormularioEmpresa(e);
+        if (btnEmpresaSubmit) btnEmpresaSubmit.textContent = "Salvar alterações";
+        if (btnEmpresaCancelar) btnEmpresaCancelar.classList.remove("hidden");
+        if (btnEmpresaExcluir) btnEmpresaExcluir.classList.remove("hidden");
+        if (empresasFormPanelTitle) empresasFormPanelTitle.textContent = "Editar empresa";
+        setFeedback(empresaFeedback, "", null);
+        const cnpjEl = document.getElementById("cnpj");
+        if (cnpjEl) cnpjEl.focus();
+    }
+
+    function aplicarBuscaEmpresaAoFormulario() {
+        const linhas = empresasLinhasVisiveis();
+        if (!linhas.length) {
+            setFeedback(empresaFeedback, "Nenhuma empresa encontrada para este termo.", "err");
+            return;
+        }
+        iniciarEdicaoEmpresaNoFormulario(linhas[0]);
+        setFeedback(
+            empresaFeedback,
+            linhas.length > 1
+                ? "Primeiro resultado da busca carregado para edição (vários encontrados)."
+                : "Empresa carregada no formulário para edição.",
+            "ok"
+        );
+    }
+
+    async function excluirEmpresaPorId(id) {
+        if (!Number.isFinite(id) || id < 1) return;
+        const ok = await appConfirm(
+            "A empresa será desativada: some das listas e de novos cadastros; pendências, templates e usuários permanecem no histórico. Você pode reativar depois.",
+            "Desativar empresa",
+            {
+                confirmLabel: "Desativar",
+                cancelLabel: "Cancelar",
+                danger: true,
+            }
+        );
+        if (!ok) return;
+        setFeedback(empresaFeedback, "", null);
+        try {
+            await fetchJson(`/api/empresas/${id}`, { method: "DELETE", headers: headers() });
+            if (empresaEditandoId === id) limparEdicaoEmpresa();
+            setFeedback(empresaFeedback, "Empresa desativada.", "ok");
+            await carregarEmpresas();
+        } catch (err) {
+            setFeedback(empresaFeedback, err.message || "Não foi possível desativar.", "err");
+        }
+    }
+
+    async function reativarEmpresaPorId(id) {
+        if (!Number.isFinite(id) || id < 1) return;
+        setFeedback(empresaFeedback, "", null);
+        try {
+            await fetchJson(`/api/empresas/${id}/reativar`, { method: "POST", headers: headers() });
+            setFeedback(empresaFeedback, "Empresa reativada.", "ok");
+            await carregarEmpresas();
+        } catch (err) {
+            setFeedback(empresaFeedback, err.message || "Não foi possível reativar.", "err");
+        }
     }
 
     function popularSelectDocsValidadosEmpresa(empresas) {
@@ -793,7 +1178,9 @@
     }
 
     async function carregarEmpresas() {
-        const empresas = await fetchJson("/api/empresas", { headers: headers() });
+        const incluir = empresasIncluirInativasEl && empresasIncluirInativasEl.checked;
+        const qs = incluir ? "?incluirInativas=true" : "";
+        const empresas = await fetchJson(`/api/empresas${qs}`, { headers: headers() });
         renderEmpresas(empresas);
     }
 
@@ -1343,7 +1730,11 @@
         }
 
         try {
-            pendList = await fetchJson(`/api/pendencias?ano=${comp.ano}&mes=${comp.mes}`, { headers: headers() });
+            // Competências arquivadas (todas validadas) somem da lista padrão; o painel precisa dos totais reais.
+            pendList = await fetchJson(
+                `/api/pendencias?ano=${comp.ano}&mes=${comp.mes}&incluirArquivadas=true`,
+                { headers: headers() }
+            );
         } catch {
             errs.push("pendências");
         }
@@ -1417,7 +1808,10 @@
         const errs = [];
         let pendList = [];
         try {
-            pendList = await fetchJson(`/api/pendencias?ano=${comp.ano}&mes=${comp.mes}`, { headers: headers() });
+            pendList = await fetchJson(
+                `/api/pendencias?ano=${comp.ano}&mes=${comp.mes}&incluirArquivadas=true`,
+                { headers: headers() }
+            );
         } catch {
             errs.push("pendências");
         }
@@ -1457,6 +1851,14 @@
         if (!session || session.perfil !== "CONTADOR") return;
         if (screenId === "screen-pendencias") {
             void carregarPendenciasContador();
+        }
+    }
+
+    /** Recarrega a lista do cliente ao entrar na tela (filtro ano/mês atual do formulário). */
+    function refreshPendenciasClienteIfNeeded(screenId) {
+        if (!session || session.perfil !== "CLIENTE") return;
+        if (screenId === "screen-cliente-pendencias") {
+            void carregarPendenciasCliente();
         }
     }
 
@@ -1509,9 +1911,13 @@
         }
     }
 
-    loginForm.addEventListener("submit", async (ev) => {
+    document.addEventListener("submit", async (ev) => {
+        const form = ev.target;
+        if (!(form instanceof HTMLFormElement) || form.id !== "form-login") return;
         ev.preventDefault();
-        setFeedback(loginFeedback, "", null);
+
+        const feedbackEl = document.getElementById("login-feedback") || loginFeedback;
+        setFeedback(feedbackEl, "", null);
         const email = document.getElementById("login-email").value.trim();
         const senha = document.getElementById("login-senha").value;
         try {
@@ -1523,7 +1929,7 @@
             salvarSessao(data);
             await initAfterLogin();
         } catch (e) {
-            setFeedback(loginFeedback, e.message || "Falha no login.", "err");
+            setFeedback(feedbackEl, e.message || "Falha no login.", "err");
         }
     });
 
@@ -1569,25 +1975,98 @@
         setFeedback(empresaFeedback, "", null);
         try {
             const cpfResponsavelDigits = somenteDigitos(document.getElementById("cpfResponsavel").value);
-            await fetchJson("/api/empresas", {
-                method: "POST",
-                headers: headers({ "Content-Type": "application/json" }),
-                body: JSON.stringify({
-                    cnpj: somenteDigitos(document.getElementById("cnpj").value),
-                    razaoSocial: document.getElementById("razaoSocial").value.trim(),
-                    cpfResponsavel: cpfResponsavelDigits || null,
-                    mei: document.getElementById("mei").checked,
-                    vencimentoDas: document.getElementById("vencimentoDas").value || null,
-                    vencimentoCertificadoMei: document.getElementById("vencimentoCertificadoMei").value || null,
-                }),
-            });
-            empresaForm.reset();
-            setFeedback(empresaFeedback, "Empresa cadastrada.", "ok");
+            const payload = {
+                cnpj: somenteDigitos(document.getElementById("cnpj").value),
+                razaoSocial: document.getElementById("razaoSocial").value.trim(),
+                cpfResponsavel: cpfResponsavelDigits || null,
+                mei: document.getElementById("mei").checked,
+                vencimentoDas: document.getElementById("vencimentoDas").value || null,
+                vencimentoCertificadoMei: document.getElementById("vencimentoCertificadoMei").value || null,
+            };
+            if (empresaEditandoId != null) {
+                await fetchJson(`/api/empresas/${empresaEditandoId}`, {
+                    method: "PUT",
+                    headers: headers({ "Content-Type": "application/json" }),
+                    body: JSON.stringify(payload),
+                });
+                setFeedback(empresaFeedback, "Empresa atualizada.", "ok");
+                limparEdicaoEmpresa();
+            } else {
+                await fetchJson("/api/empresas", {
+                    method: "POST",
+                    headers: headers({ "Content-Type": "application/json" }),
+                    body: JSON.stringify(payload),
+                });
+                setFeedback(empresaFeedback, "Empresa cadastrada.", "ok");
+                empresaForm.reset();
+            }
             await carregarEmpresas();
         } catch (e) {
-            setFeedback(empresaFeedback, e.message || "Erro ao cadastrar empresa.", "err");
+            setFeedback(empresaFeedback, e.message || "Erro ao salvar empresa.", "err");
         }
     });
+
+    if (btnEmpresaCancelar) {
+        btnEmpresaCancelar.addEventListener("click", () => {
+            limparEdicaoEmpresa();
+            setFeedback(empresaFeedback, "", null);
+        });
+    }
+
+    if (btnEmpresaExcluir) {
+        btnEmpresaExcluir.addEventListener("click", () => {
+            const id = empresaEditandoId != null ? Number(empresaEditandoId) : NaN;
+            excluirEmpresaPorId(id);
+        });
+    }
+
+    if (empresasBuscaInput) {
+        empresasBuscaInput.addEventListener("input", () => {
+            renderEmpresasTabelaUI();
+        });
+        empresasBuscaInput.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") {
+                ev.preventDefault();
+                aplicarBuscaEmpresaAoFormulario();
+            }
+        });
+    }
+
+    if (listaEmpresas) {
+        listaEmpresas.addEventListener("click", async (ev) => {
+            const editBtn = ev.target.closest("[data-empresa-editar]");
+            if (editBtn) {
+                const raw = editBtn.getAttribute("data-empresa-editar");
+                const id = raw ? parseInt(raw, 10) : NaN;
+                if (!Number.isFinite(id)) return;
+                const e = empresasCache.find((x) => Number(x.id) === id);
+                if (!e) return;
+                iniciarEdicaoEmpresaNoFormulario(e);
+                return;
+            }
+            const reativarBtn = ev.target.closest("[data-empresa-reativar]");
+            if (reativarBtn) {
+                ev.preventDefault();
+                const raw = reativarBtn.getAttribute("data-empresa-reativar");
+                const id = raw ? parseInt(raw, 10) : NaN;
+                await reativarEmpresaPorId(id);
+                return;
+            }
+            const delBtn = ev.target.closest("[data-empresa-excluir]");
+            if (delBtn) {
+                ev.preventDefault();
+                const raw = delBtn.getAttribute("data-empresa-excluir");
+                const id = raw ? parseInt(raw, 10) : NaN;
+                await excluirEmpresaPorId(id);
+            }
+        });
+    }
+
+    if (empresasIncluirInativasEl) {
+        empresasIncluirInativasEl.addEventListener("change", () => {
+            void carregarEmpresas();
+        });
+    }
 
     templateForm.addEventListener("submit", async (ev) => {
         ev.preventDefault();
@@ -1796,6 +2275,7 @@
                 refreshDocumentosValidadosIfNeeded(target);
                 refreshDashboardIfNeeded(target);
                 refreshPendenciasContadorIfNeeded(target);
+                refreshPendenciasClienteIfNeeded(target);
             }
         });
     });
@@ -1807,6 +2287,7 @@
         refreshDocumentosValidadosIfNeeded(btn.dataset.target);
         refreshDashboardIfNeeded(btn.dataset.target);
         refreshPendenciasContadorIfNeeded(btn.dataset.target);
+        refreshPendenciasClienteIfNeeded(btn.dataset.target);
     });
 
     async function carregarRadar() {
@@ -2051,27 +2532,149 @@
         }
     });
 
-    fiscalCertificadoForm.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-        setFeedback(certFeedback, "", null);
+    const CERT_STATUS_OPTS = [
+        "EM_ANALISE",
+        "AGUARDANDO_BIOMETRIA",
+        "EMITIDO",
+        "INSTALADO",
+        "APROVADO",
+        "ENTREGUE",
+        "CANCELADO",
+        "RENOVACAO_PENDENTE",
+    ];
+
+    async function carregarListaCertificados() {
+        if (!features.certificadoDigital) {
+            return;
+        }
+        const tbody = document.getElementById("cert-tbody");
+        const vazio = document.getElementById("cert-lista-vazio");
+        const tab = document.getElementById("cert-tabela");
+        if (!tbody) {
+            return;
+        }
         try {
-            await fetchJson("/api/fiscal/certificados", {
-                method: "POST",
-                headers: headers({ "Content-Type": "application/json" }),
-                body: JSON.stringify({
+            const list = await fetchJson("/api/fiscal/certificados", { headers: headers() });
+            tbody.innerHTML = "";
+            if (!list.length) {
+                if (vazio) {
+                    vazio.classList.remove("hidden");
+                }
+                if (tab) {
+                    tab.classList.add("hidden");
+                }
+                return;
+            }
+            if (vazio) {
+                vazio.classList.add("hidden");
+            }
+            if (tab) {
+                tab.classList.remove("hidden");
+            }
+            list.forEach((row) => {
+                const tr = document.createElement("tr");
+                const empNome = row.empresa && row.empresa.razaoSocial ? row.empresa.razaoSocial : "—";
+                const venc = row.dataVencimentoPrevista || "—";
+                let criado = "—";
+                if (row.criadoEm) {
+                    criado =
+                        typeof row.criadoEm === "string"
+                            ? row.criadoEm.slice(0, 10)
+                            : String(row.criadoEm);
+                }
+                const sel = document.createElement("select");
+                sel.className = "cert-status-select";
+                sel.setAttribute("aria-label", "Status do pedido");
+                CERT_STATUS_OPTS.forEach((s) => {
+                    const o = document.createElement("option");
+                    o.value = s;
+                    o.textContent = s;
+                    if (row.status === s) {
+                        o.selected = true;
+                    }
+                    sel.appendChild(o);
+                });
+                const id = Number(row.id);
+                sel.addEventListener("change", async () => {
+                    try {
+                        await fetchJson(`/api/fiscal/certificados/${id}`, {
+                            method: "PATCH",
+                            headers: headers({ "Content-Type": "application/json" }),
+                            body: JSON.stringify({ status: sel.value }),
+                        });
+                        setFeedback(certFeedback, "Status atualizado.", "ok");
+                    } catch (e) {
+                        setFeedback(certFeedback, e.message || "Erro ao atualizar status.", "err");
+                        void carregarListaCertificados();
+                    }
+                });
+                const td0 = document.createElement("td");
+                td0.textContent = criado;
+                const td1 = document.createElement("td");
+                td1.textContent = row.titular || "";
+                const td2 = document.createElement("td");
+                td2.textContent = empNome;
+                const td3 = document.createElement("td");
+                td3.textContent = row.tipoCertificado || "";
+                const td4 = document.createElement("td");
+                td4.textContent = venc;
+                const td5 = document.createElement("td");
+                td5.appendChild(sel);
+                tr.append(td0, td1, td2, td3, td4, td5);
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = "";
+            if (vazio) {
+                vazio.classList.remove("hidden");
+            }
+            if (tab) {
+                tab.classList.add("hidden");
+            }
+        }
+    }
+
+    if (fiscalCertificadoForm) {
+        fiscalCertificadoForm.addEventListener("submit", async (ev) => {
+            ev.preventDefault();
+            if (!features.certificadoDigital) {
+                return;
+            }
+            setFeedback(certFeedback, "", null);
+            try {
+                const empSel = document.getElementById("cert-empresa-id");
+                const empresaId = empSel && empSel.value ? Number(empSel.value) : null;
+                const venc = document.getElementById("cert-venc-previsto");
+                const obs = document.getElementById("cert-obs");
+                const payload = {
                     documentoSolicitante: somenteDigitos(document.getElementById("cert-doc").value),
                     titular: document.getElementById("cert-titular").value.trim(),
                     emailContato: document.getElementById("cert-email").value.trim(),
                     tipoCertificado: document.getElementById("cert-tipo").value.trim(),
                     validadeMeses: Number(document.getElementById("cert-validade").value),
-                }),
-            });
-            fiscalCertificadoForm.reset();
-            setFeedback(certFeedback, "Venda de certificado registrada.", "ok");
-        } catch (e) {
-            setFeedback(certFeedback, e.message || "Erro ao registrar certificado.", "err");
-        }
-    });
+                };
+                if (empresaId && Number.isFinite(empresaId)) {
+                    payload.empresaId = empresaId;
+                }
+                if (venc && venc.value) {
+                    payload.dataVencimentoPrevista = venc.value;
+                }
+                if (obs && obs.value.trim()) {
+                    payload.observacaoInterna = obs.value.trim();
+                }
+                await fetchJson("/api/fiscal/certificados", {
+                    method: "POST",
+                    headers: headers({ "Content-Type": "application/json" }),
+                    body: JSON.stringify(payload),
+                });
+                fiscalCertificadoForm.reset();
+                setFeedback(certFeedback, "Pedido de certificado registrado.", "ok");
+                await carregarListaCertificados();
+            } catch (e) {
+                setFeedback(certFeedback, e.message || "Erro ao registrar certificado.", "err");
+            }
+        });
+    }
 
     btnGerarAlertas.addEventListener("click", async () => {
         setFeedback(alertaFeedback, "", null);
@@ -2108,21 +2711,24 @@
         }
     });
 
-    try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
-            session = JSON.parse(raw);
-            initAfterLogin().catch(() => {
-                limparSessao();
+    (async function bootstrap() {
+        await loadFeatures();
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) {
+                session = JSON.parse(raw);
+                initAfterLogin().catch(() => {
+                    limparSessao();
+                    setViewByPerfil();
+                });
+            } else {
                 setViewByPerfil();
-            });
-        } else {
+            }
+        } catch {
+            limparSessao();
             setViewByPerfil();
         }
-    } catch {
-        limparSessao();
-        setViewByPerfil();
-    }
+    })();
 
     if ("serviceWorker" in navigator) {
         const localHost =
