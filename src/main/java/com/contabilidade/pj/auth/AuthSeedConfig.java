@@ -51,8 +51,18 @@ public class AuthSeedConfig {
         try {
             jdbcTemplate.execute("ALTER TABLE usuarios MODIFY COLUMN perfil ENUM('ADM','CONTADOR','CLIENTE') NOT NULL");
         } catch (Exception ex) {
-            // Mantém startup resiliente em ambientes onde o tipo já suporta ADM ou usa outro dialeto.
             log.debug("Não foi necessário/possível alterar enum de perfil automaticamente: {}", ex.getMessage());
+        }
+        try {
+            // Corrige usuários que ficaram com ativo=0 por migration sem DEFAULT.
+            int corrigidos = jdbcTemplate.update(
+                    "UPDATE usuarios SET ativo = 1 WHERE ativo = 0 OR ativo IS NULL"
+            );
+            if (corrigidos > 0) {
+                log.warn("Migration ativo: {} usuário(s) reativado(s) (coluna adicionada sem DEFAULT 1).", corrigidos);
+            }
+        } catch (Exception ex) {
+            log.debug("Migration ativo não necessária ou falhou: {}", ex.getMessage());
         }
     }
 

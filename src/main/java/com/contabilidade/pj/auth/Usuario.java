@@ -38,7 +38,7 @@ public class Usuario {
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean ativo = true;
 
     public Long getId() {
