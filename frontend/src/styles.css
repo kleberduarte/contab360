@@ -2889,9 +2889,16 @@ button.danger {
   }
 
   .login-sidebar-react {
-    padding: 1.2rem 1rem;
+    padding: 1rem 1.2rem;
+    display: flex;
+    align-items: center;
   }
 
+  .login-brand-react {
+    margin-bottom: 0;
+  }
+
+  .login-sidebar-tag-react,
   .login-sidebar-list-react {
     display: none;
   }
