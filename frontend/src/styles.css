@@ -2363,9 +2363,85 @@ button.small:hover:not(:disabled) {
   font-weight: 500;
 }
 
-.primeiro-acesso-label .login-input-wrap-react input {
-  padding-left: 2.35rem;
-  padding-right: 2.35rem;
+.pa-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pa-field__icon {
+  position: absolute;
+  left: 0.78rem;
+  display: flex;
+  align-items: center;
+  color: #8ba0b7;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pa-field__input {
+  width: 100%;
+  height: 44px;
+  padding: 0 2.6rem 0 2.6rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.93rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.pa-field__input::placeholder {
+  color: #b0bec5;
+  font-size: 0.88rem;
+}
+
+.pa-field__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.pa-field--error .pa-field__input {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.pa-field--ok .pa-field__input {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.pa-field__eye {
+  position: absolute;
+  right: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  background: transparent;
+  color: #8ba0b7;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.pa-field__eye:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pa-field__status {
+  position: absolute;
+  right: 0.7rem;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
 }
 
 .pa-strength {

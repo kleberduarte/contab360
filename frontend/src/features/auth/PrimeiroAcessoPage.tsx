@@ -112,53 +112,78 @@ export function PrimeiroAcessoPage({ sessao, onSenhaCriada }: { sessao: Sessao; 
           <form onSubmit={submit} className="primeiro-acesso-form">
             <label htmlFor={novaSenhaId} className="primeiro-acesso-label">
               Nova senha
-              <div className="login-password-row-react login-input-wrap-react">
-                <span className="login-input-icon-react" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none">
+              <div className="pa-field">
+                <span className="pa-field__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
                     <rect x="4.75" y="10.25" width="14.5" height="8.75" rx="2" stroke="currentColor" strokeWidth="1.6" />
                     <path d="M8.5 10.25V8.75C8.5 6.82 10.07 5.25 12 5.25C13.93 5.25 15.5 6.82 15.5 8.75V10.25" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
                 </span>
                 <input
                   id={novaSenhaId}
+                  className="pa-field__input"
                   type={mostrarSenha ? "text" : "password"}
                   value={novaSenha}
                   onChange={(e) => setNovaSenha(e.target.value)}
                   autoComplete="new-password"
+                  placeholder="Mínimo 6 caracteres"
                   minLength={6}
                   required
                 />
                 <button
                   type="button"
-                  className="login-eye-react"
+                  className="pa-field__eye"
                   onClick={() => setMostrarSenha((s) => !s)}
                   aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M2.75 12C2.75 12 6.25 6.75 12 6.75C17.75 6.75 21.25 12 21.25 12C21.25 12 17.75 17.25 12 17.25C6.25 17.25 2.75 12 2.75 12Z" stroke="currentColor" strokeWidth="1.6" />
-                    <circle cx="12" cy="12" r="2.4" stroke="currentColor" strokeWidth="1.6" />
-                  </svg>
+                  {mostrarSenha ? (
+                    <svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <path d="M1 1l22 22" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true">
+                      <path d="M2.75 12C2.75 12 6.25 6.75 12 6.75C17.75 6.75 21.25 12 21.25 12C21.25 12 17.75 17.25 12 17.25C6.25 17.25 2.75 12 2.75 12Z" stroke="currentColor" strokeWidth="1.6" />
+                      <circle cx="12" cy="12" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </label>
 
             <label htmlFor={confirmarId} className="primeiro-acesso-label">
               Confirmar senha
-              <div className="login-input-wrap-react">
-                <span className="login-input-icon-react" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none">
+              <div className={`pa-field${confirmar && confirmar !== novaSenha ? " pa-field--error" : confirmar && confirmar === novaSenha ? " pa-field--ok" : ""}`}>
+                <span className="pa-field__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
                     <rect x="4.75" y="10.25" width="14.5" height="8.75" rx="2" stroke="currentColor" strokeWidth="1.6" />
                     <path d="M8.5 10.25V8.75C8.5 6.82 10.07 5.25 12 5.25C13.93 5.25 15.5 6.82 15.5 8.75V10.25" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
                 </span>
                 <input
                   id={confirmarId}
+                  className="pa-field__input"
                   type={mostrarSenha ? "text" : "password"}
                   value={confirmar}
                   onChange={(e) => setConfirmar(e.target.value)}
                   autoComplete="new-password"
+                  placeholder="Repita a nova senha"
                   required
                 />
+                {confirmar && (
+                  <span className="pa-field__status" aria-hidden="true">
+                    {confirmar === novaSenha ? (
+                      <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+                        <path d="M20 6L9 17l-5-5" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  </span>
+                )}
               </div>
             </label>
 
