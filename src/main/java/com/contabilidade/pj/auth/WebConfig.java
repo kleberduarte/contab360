@@ -3,8 +3,11 @@ package com.contabilidade.pj.auth;
 import com.contabilidade.pj.ia.IaObservadoraInterceptor;
 import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -29,8 +32,8 @@ public class WebConfig implements WebMvcConfigurer {
         this.iaObservadoraInterceptor = iaObservadoraInterceptor;
     }
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
+    @Bean
+    public CorsFilter corsFilter() {
         String[] origins = (corsOrigins == null || corsOrigins.isBlank())
                 ? DEFAULT_CORS_ORIGINS
                 : Arrays.stream(corsOrigins.split(","))
@@ -38,12 +41,19 @@ public class WebConfig implements WebMvcConfigurer {
                         .filter(s -> !s.isBlank())
                         .toArray(String[]::new);
         if (origins.length == 0) origins = DEFAULT_CORS_ORIGINS;
-        registry.addMapping("/api/**")
-                .allowedOrigins(origins)
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(false)
-                .maxAge(3600);
+
+        CorsConfiguration config = new CorsConfiguration();
+        for (String origin : origins) {
+            config.addAllowedOrigin(origin);
+        }
+        config.addAllowedMethod("*");
+        config.addAllowedHeader("*");
+        config.setAllowCredentials(false);
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", config);
+        return new CorsFilter(source);
     }
 
     @Override
