@@ -10,6 +10,8 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class EntregaDocumentoService {
+
+    private static final Logger log = LoggerFactory.getLogger(EntregaDocumentoService.class);
+    private static final java.util.Set<String> EXTENSOES_PERMITIDAS = java.util.Set.of("pdf", "xml", "png", "jpg", "jpeg");
 
     private final EntregaDocumentoRepository entregaDocumentoRepository;
     private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
@@ -57,9 +62,12 @@ public class EntregaDocumentoService {
         String extensao = "";
         int idx = nomeOriginal.lastIndexOf('.');
         if (idx >= 0 && idx < nomeOriginal.length() - 1) {
-            extensao = "." + nomeOriginal.substring(idx + 1);
+            extensao = nomeOriginal.substring(idx + 1).toLowerCase();
         }
-        String nomeSalvo = "pendencia-" + pendenciaId + "-" + UUID.randomUUID() + extensao;
+        if (!EXTENSOES_PERMITIDAS.contains(extensao)) {
+            throw new IllegalArgumentException("Tipo de arquivo não permitido. Envie PDF, XML, PNG ou JPG.");
+        }
+        String nomeSalvo = "pendencia-" + pendenciaId + "-" + UUID.randomUUID() + "." + extensao;
 
         try {
             Files.createDirectories(uploadBasePath);
@@ -77,7 +85,21 @@ public class EntregaDocumentoService {
             pendenciaDocumentoRepository.save(pendencia);
             competenciaArquivamentoService.sincronizarArquivamentoCompetencia(pendencia.getCompetencia().getId());
             EntregaDocumento salva = entregaDocumentoRepository.save(entrega);
-            documentoInteligenciaService.iniciarProcessamento(salva);
+            /*
+             * Processamento da IA na mesma transação: qualquer exceção não tratada fazia rollback de entrega + status.
+             * O envio do cliente deve permanecer gravado; falhas na leitura automática ficam só no log (a fila pode ser reprocessada).
+             */
+            try {
+                documentoInteligenciaService.iniciarProcessamento(salva);
+            } catch (Exception ex) {
+                log.warn(
+                        "Entrega id={} pendenciaId={} salva no disco, mas falhou ao iniciar processamento pela IA: {}",
+                        salva.getId(),
+                        pendenciaId,
+                        ex.getMessage(),
+                        ex
+                );
+            }
             return salva;
         } catch (IOException ex) {
             throw new IllegalArgumentException("Falha ao salvar arquivo.");

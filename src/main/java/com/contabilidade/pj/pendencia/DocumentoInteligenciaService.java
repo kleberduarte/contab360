@@ -28,7 +28,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -806,9 +808,22 @@ public class DocumentoInteligenciaService {
         }
     }
 
+    private static DocumentBuilderFactory criarDbfSeguro() {
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            dbf.setXIncludeAware(false);
+            dbf.setExpandEntityReferences(false);
+            dbf.setNamespaceAware(false);
+            return dbf;
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException("Falha ao configurar XML parser seguro", e);
+        }
+    }
+
     private void processarXml(DocumentoProcessamento processamento, Path path) throws Exception {
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        dbf.setNamespaceAware(false);
+        DocumentBuilderFactory dbf = criarDbfSeguro();
         Document doc = dbf.newDocumentBuilder().parse(path.toFile());
         doc.getDocumentElement().normalize();
 
