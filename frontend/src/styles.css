@@ -234,19 +234,18 @@ textarea:focus-visible {
 }
 
 .login-form-react button[type="submit"] {
-  border: none;
+  width: 100%;
   border-radius: 11px;
   min-height: 44px;
   background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
   box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
   transition: filter 0.18s var(--ease-spring), transform 0.12s ease;
+  transform: none;
 }
 
 .login-form-react button[type="submit"]:hover:not(:disabled) {
   filter: brightness(1.06);
+  transform: none;
 }
 
 .login-form-react button[type="submit"]:active:not(:disabled) {
@@ -1027,33 +1026,140 @@ textarea:focus-visible {
   gap: 0.45rem;
 }
 
-.empresas-react-actions button,
-.empresas-react-list-top button,
-.empresas-react-table button.small {
+/* ── Sistema de Botões Global ─────────────────────────────────────────── */
+
+button[type="submit"],
+button[type="button"].btn,
+button.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0 1.1rem;
   border: none;
   border-radius: 8px;
-  min-height: 34px;
-  padding: 0 0.75rem;
-  background: #21c25e;
-  color: #fff;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
+  background: linear-gradient(160deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(22, 163, 74, 0.28), inset 0 1px 0 rgba(255,255,255,0.12);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+button[type="submit"]:hover:not(:disabled),
+button[type="button"].btn:hover:not(:disabled),
+button.btn:hover:not(:disabled) {
+  background: linear-gradient(160deg, #16a34a 0%, #15803d 100%);
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.32), inset 0 1px 0 rgba(255,255,255,0.1);
+  transform: translateY(-1px);
+}
+
+button[type="submit"]:active:not(:disabled),
+button[type="button"].btn:active:not(:disabled),
+button.btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(22, 163, 74, 0.2);
+}
+
+button[type="submit"]:disabled,
+button[type="button"].btn:disabled,
+button.btn:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 button.ghost {
-  background: var(--fill-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  user-select: none;
+  white-space: nowrap;
 }
 
-button.ghost:hover {
-  background: #e2e8f0;
+button.ghost:hover:not(:disabled) {
+  background: var(--fill-secondary);
   border-color: var(--border-strong);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+button.ghost:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+button.ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 button.danger {
-  background: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(160deg, #ef4444 0%, #dc2626 100%);
   color: #fff;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.28), inset 0 1px 0 rgba(255,255,255,0.1);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+button.danger:hover:not(:disabled) {
+  background: linear-gradient(160deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.32);
+  transform: translateY(-1px);
+}
+
+button.danger:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.2);
+}
+
+button.danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+button.small {
+  min-height: 30px;
+  padding: 0 0.65rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+}
+
+button.small:hover:not(:disabled) {
+  transform: none;
 }
 
 .empresas-react-list-top {
