@@ -4,6 +4,13 @@ import { Sessao } from "./session";
 // Em desenvolvimento, usa string vazia para aproveitar o proxy do Vite (/api -> localhost:8080).
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
+let _onUnauthorized: (() => void) | null = null;
+
+/** Registra o callback que será chamado quando qualquer request retornar 401. */
+export function setOnUnauthorized(cb: () => void): void {
+  _onUnauthorized = cb;
+}
+
 type RequestOptions = RequestInit & {
   sessao?: Sessao | null;
 };
@@ -44,6 +51,9 @@ export async function apiFetchJson<T>(url: string, options: RequestOptions = {})
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      _onUnauthorized?.();
+    }
     const text = await response.text();
     throw new Error(text || `Erro HTTP ${response.status}`);
   }
@@ -69,6 +79,9 @@ export async function apiFetchFormData<T>(url: string, formData: FormData, sessa
   });
   const text = await response.text();
   if (!response.ok) {
+    if (response.status === 401) {
+      _onUnauthorized?.();
+    }
     let msg = text || `Erro HTTP ${response.status}`;
     try {
       const err = JSON.parse(text) as { message?: string };

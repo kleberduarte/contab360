@@ -21,6 +21,7 @@ import {
   UsuariosPage
 } from "./routes/lazyPages";
 import { clearSessao, getSessao, PerfilUsuario, Sessao, setSessao } from "./lib/session";
+import { setOnUnauthorized } from "./lib/api";
 import { HeaderUserMenu } from "./components/HeaderUserMenu";
 import { useNavigate } from "react-router-dom";
 
@@ -482,6 +483,13 @@ function getLinkGroupsByPerfil(perfil: PerfilUsuario): LinkGroup[] {
 
 export function App() {
   const [sessao, setSessaoState] = useState<Sessao | null>(() => getSessao());
+
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      clearSessao();
+      setSessaoState(null);
+    });
+  }, []);
 
   function onLogin(next: Sessao) {
     setSessao(next);

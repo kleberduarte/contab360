@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
-    private static final int SESSION_HOURS = 12;
+    private static final int SESSION_HOURS = 24;
 
     private final UsuarioRepository usuarioRepository;
     private final SessaoAcessoRepository sessaoAcessoRepository;
