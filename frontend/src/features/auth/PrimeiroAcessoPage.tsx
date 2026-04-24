@@ -111,8 +111,8 @@ export function PrimeiroAcessoPage({ sessao, onSenhaCriada }: { sessao: Sessao; 
 
           <form onSubmit={submit} className="primeiro-acesso-form">
             <label htmlFor={novaSenhaId} className="primeiro-acesso-label">
-              Nova senha
               <div className="pa-field">
+                <span className="pa-field__floating-label">Nova senha</span>
                 <span className="pa-field__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
                     <rect x="4.75" y="10.25" width="14.5" height="8.75" rx="2" stroke="currentColor" strokeWidth="1.6" />
@@ -126,7 +126,6 @@ export function PrimeiroAcessoPage({ sessao, onSenhaCriada }: { sessao: Sessao; 
                   value={novaSenha}
                   onChange={(e) => setNovaSenha(e.target.value)}
                   autoComplete="new-password"
-                  placeholder="Mínimo 6 caracteres"
                   minLength={6}
                   required
                 />
@@ -153,8 +152,8 @@ export function PrimeiroAcessoPage({ sessao, onSenhaCriada }: { sessao: Sessao; 
             </label>
 
             <label htmlFor={confirmarId} className="primeiro-acesso-label">
-              Confirmar senha
               <div className={`pa-field${confirmar && confirmar !== novaSenha ? " pa-field--error" : confirmar && confirmar === novaSenha ? " pa-field--ok" : ""}`}>
+                <span className="pa-field__floating-label">Confirmar senha</span>
                 <span className="pa-field__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
                     <rect x="4.75" y="10.25" width="14.5" height="8.75" rx="2" stroke="currentColor" strokeWidth="1.6" />
@@ -168,7 +167,6 @@ export function PrimeiroAcessoPage({ sessao, onSenhaCriada }: { sessao: Sessao; 
                   value={confirmar}
                   onChange={(e) => setConfirmar(e.target.value)}
                   autoComplete="new-password"
-                  placeholder="Repita a nova senha"
                   required
                 />
                 {confirmar && (

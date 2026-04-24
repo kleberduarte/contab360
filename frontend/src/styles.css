@@ -2357,7 +2357,6 @@ button.small:hover:not(:disabled) {
 .primeiro-acesso-label {
   display: flex;
   flex-direction: column;
-  gap: 0.38rem;
   font-size: 0.84rem;
   color: var(--muted);
   font-weight: 500;
@@ -2367,7 +2366,27 @@ button.small:hover:not(:disabled) {
   position: relative;
   display: flex;
   align-items: center;
+  margin-top: 0.2rem;
 }
+
+.pa-field__floating-label {
+  position: absolute;
+  top: -0.48rem;
+  left: 0.72rem;
+  z-index: 1;
+  padding: 0 0.3rem;
+  background: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #94a3b8;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pa-field--ok .pa-field__floating-label   { color: #16a34a; }
+.pa-field--error .pa-field__floating-label { color: #dc2626; }
 
 .pa-field__icon {
   position: absolute;
