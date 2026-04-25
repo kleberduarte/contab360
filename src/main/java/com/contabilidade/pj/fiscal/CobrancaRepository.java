@@ -1,6 +1,0 @@
-package com.contabilidade.pj.fiscal;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface CobrancaRepository extends JpaRepository<Cobranca, Long> {
-}

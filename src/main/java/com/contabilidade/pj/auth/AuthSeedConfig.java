@@ -1,7 +1,7 @@
 package com.contabilidade.pj.auth;
 
-import com.contabilidade.pj.empresa.Empresa;
-import com.contabilidade.pj.empresa.EmpresaRepository;
+import com.contabilidade.pj.empresa.entity.Empresa;
+import com.contabilidade.pj.empresa.repository.EmpresaRepository;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -12,6 +12,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.contabilidade.pj.auth.entity.*;
+import com.contabilidade.pj.auth.repository.*;
+import com.contabilidade.pj.auth.service.AuthService;
+import com.contabilidade.pj.auth.service.UsuarioService;
 
 /**
  * Garante usuários demo e vínculo com empresas. Se a 2ª empresa foi cadastrada depois da primeira subida,

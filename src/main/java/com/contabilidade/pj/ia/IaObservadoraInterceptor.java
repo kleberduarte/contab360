@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import com.contabilidade.pj.ia.service.IaObservadoraService;
+import com.contabilidade.pj.ia.service.AuditoriaService;
 
 @Component
 public class IaObservadoraInterceptor implements HandlerInterceptor {

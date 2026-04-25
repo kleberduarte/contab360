@@ -1,6 +1,6 @@
 package com.contabilidade.pj.fiscal.sefaz;
 
-import com.contabilidade.pj.fiscal.NotaFiscal;
+import com.contabilidade.pj.fiscal.entity.NotaFiscal;
 
 /**
  * Placeholder para integração real: assinar XML NFe, SOAP NFeAutorização, tratar retorno e DANFE oficial.

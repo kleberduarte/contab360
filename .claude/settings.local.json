@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:8080/api/pendencias -H 'Authorization: Bearer 8337c08f1f3744fbafeda8f69bac30bdd889fcf88af649039dd71c0c7441e017')",
+      "Bash(python -m json.tool)"
+    ]
+  }
+}

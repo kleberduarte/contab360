@@ -1,6 +1,6 @@
 package com.contabilidade.pj.fiscal.sefaz;
 
-import com.contabilidade.pj.fiscal.NotaFiscal;
+import com.contabilidade.pj.fiscal.entity.NotaFiscal;
 
 /** Modo explicitamente desligado: nota gravada sem autorização municipal automática. */
 public final class NfseEmissaoDesligada implements NfseEmissaoPort {

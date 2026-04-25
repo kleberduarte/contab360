@@ -1,6 +1,6 @@
 package com.contabilidade.pj.fiscal.sefaz;
 
-import com.contabilidade.pj.fiscal.NotaFiscal;
+import com.contabilidade.pj.fiscal.entity.NotaFiscal;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;

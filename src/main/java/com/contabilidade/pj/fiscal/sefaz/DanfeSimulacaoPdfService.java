@@ -1,7 +1,7 @@
 package com.contabilidade.pj.fiscal.sefaz;
 
-import com.contabilidade.pj.fiscal.NotaFiscal;
-import com.contabilidade.pj.fiscal.TipoDocumentoFiscal;
+import com.contabilidade.pj.fiscal.entity.NotaFiscal;
+import com.contabilidade.pj.fiscal.entity.TipoDocumentoFiscal;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;

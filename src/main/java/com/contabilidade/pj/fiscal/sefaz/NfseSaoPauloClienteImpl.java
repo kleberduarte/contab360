@@ -1,6 +1,6 @@
 package com.contabilidade.pj.fiscal.sefaz;
 
-import com.contabilidade.pj.fiscal.NotaFiscal;
+import com.contabilidade.pj.fiscal.entity.NotaFiscal;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 

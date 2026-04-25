@@ -1,6 +1,6 @@
 package com.contabilidade.pj.fiscal.sefaz;
 
-import com.contabilidade.pj.fiscal.NotaFiscal;
+import com.contabilidade.pj.fiscal.entity.NotaFiscal;
 
 /**
  * Porta de saída para autorização eletrônica (SEFAZ NFe / extensível). Implementações: simulação local e, no futuro, cliente SOAP assinado.

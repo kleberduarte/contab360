@@ -1,11 +1,13 @@
 package com.contabilidade.pj.pendencia;
 
-import com.contabilidade.pj.empresa.Empresa;
-import com.contabilidade.pj.empresa.EmpresaRepository;
+import com.contabilidade.pj.empresa.entity.Empresa;
+import com.contabilidade.pj.empresa.repository.EmpresaRepository;
 import java.util.List;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.contabilidade.pj.pendencia.entity.*;
+import com.contabilidade.pj.pendencia.repository.*;
 
 @Configuration
 public class PendenciaSeedConfig {

@@ -1,6 +1,6 @@
 package com.contabilidade.pj.fiscal.sefaz;
 
-import com.contabilidade.pj.fiscal.NotaFiscal;
+import com.contabilidade.pj.fiscal.entity.NotaFiscal;
 
 /**
  * Porta municipal (NFS-e). Separada de {@link AutorizacaoFiscalPort} (NFe/SEFAZ estadual).

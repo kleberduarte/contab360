@@ -7,6 +7,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import com.contabilidade.pj.auth.service.AuthService;
+import com.contabilidade.pj.auth.entity.SessaoAcesso;
+import com.contabilidade.pj.auth.service.AuthContext;
+import com.contabilidade.pj.auth.entity.Usuario;
+import com.contabilidade.pj.auth.entity.PerfilUsuario;
 
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
