@@ -59,10 +59,27 @@ public class AuthSeedConfig {
                     "UPDATE usuarios SET ativo = 1 WHERE ativo = 0 OR ativo IS NULL"
             );
             if (corrigidos > 0) {
-                log.warn("Migration ativo: {} usuário(s) reativado(s) (coluna adicionada sem DEFAULT 1).", corrigidos);
+                log.warn("Migration usuarios.ativo: {} usuário(s) reativado(s).", corrigidos);
             }
         } catch (Exception ex) {
-            log.debug("Migration ativo não necessária ou falhou: {}", ex.getMessage());
+            log.debug("Migration usuarios.ativo não necessária ou falhou: {}", ex.getMessage());
+        }
+        try {
+            // Garante que a coluna empresas.ativo existe com DEFAULT 1 (adicionada depois da criação inicial da tabela).
+            jdbcTemplate.execute("ALTER TABLE empresas ADD COLUMN ativo TINYINT(1) NOT NULL DEFAULT 1");
+            log.info("Migration: coluna empresas.ativo criada.");
+        } catch (Exception ex) {
+            log.debug("empresas.ativo já existe ou não foi possível criar: {}", ex.getMessage());
+        }
+        try {
+            int corrigidos = jdbcTemplate.update(
+                    "UPDATE empresas SET ativo = 1 WHERE ativo IS NULL"
+            );
+            if (corrigidos > 0) {
+                log.warn("Migration empresas.ativo: {} empresa(s) corrigida(s).", corrigidos);
+            }
+        } catch (Exception ex) {
+            log.debug("Migration empresas.ativo update não necessária ou falhou: {}", ex.getMessage());
         }
     }
 

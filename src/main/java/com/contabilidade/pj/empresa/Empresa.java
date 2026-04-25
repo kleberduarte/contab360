@@ -40,7 +40,7 @@ public class Empresa {
     private LocalDate vencimentoCertificadoMei;
 
     /** Quando {@code false}, a empresa está desativada (exclusão lógica) e não entra em listagens operacionais. */
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean ativo = true;
 
     public Long getId() {
