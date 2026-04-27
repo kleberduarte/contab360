@@ -13,6 +13,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     long countByEmpresa_Id(Long empresaId);
 
+    long countByClientePessoaFisica_Id(Long clientePessoaFisicaId);
+
     boolean existsByEmail(String email);
 
     boolean existsByEmailAndIdNot(String email, Long id);

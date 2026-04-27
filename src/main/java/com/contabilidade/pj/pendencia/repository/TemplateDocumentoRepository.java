@@ -5,7 +5,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.contabilidade.pj.pendencia.entity.TemplateDocumento;
 
 public interface TemplateDocumentoRepository extends JpaRepository<TemplateDocumento, Long> {
+
     long countByEmpresa_Id(Long empresaId);
 
+    long countByClientePessoaFisica_Id(Long clientePessoaFisicaId);
+
     List<TemplateDocumento> findByEmpresaIdOrderByNomeAsc(Long empresaId);
+
+    List<TemplateDocumento> findByClientePessoaFisicaIdOrderByNomeAsc(Long clientePessoaFisicaId);
 }

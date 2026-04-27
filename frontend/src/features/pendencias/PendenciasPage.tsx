@@ -4,9 +4,12 @@ import { Sessao } from "../../lib/session";
 
 type Pendencia = {
   id: number;
-  empresaId: number;
-  empresaRazaoSocial: string;
-  empresaCnpj: string;
+  empresaId: number | null;
+  empresaRazaoSocial: string | null;
+  empresaCnpj: string | null;
+  clientePessoaFisicaId: number | null;
+  clientePessoaFisicaNome: string | null;
+  clientePessoaFisicaCpf: string | null;
   templateDocumentoId: number;
   templateDocumentoNome: string;
   competenciaAno: number;
@@ -34,6 +37,14 @@ function formatarCnpj(value: string): string {
     .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
     .replace(/\.(\d{3})(\d)/, ".$1/$2")
     .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+function formatarCpf(value: string): string {
+  const d = (value || "").replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
 }
 
 function badgeStatus(status: Pendencia["status"]) {
@@ -112,7 +123,7 @@ export function PendenciasPage({ sessao }: { sessao: Sessao }) {
     <section className="page page--pendencias pendencias-screen-react">
       <header className="pendencias-header">
         <h2>Pendências mensais</h2>
-        <p className="pendencias-lead muted-react">Gere a competência, acompanhe por empresa e documento.</p>
+        <p className="pendencias-lead muted-react">Gere a competência, acompanhe por tomador (PJ ou PF) e documento.</p>
       </header>
 
       <details className="pendencias-help">
@@ -211,9 +222,16 @@ export function PendenciasPage({ sessao }: { sessao: Sessao }) {
                   <span className="pendencia-card__id">#{pendencia.id}</span>
                   <span className={`status-chip ${badge.cls}`}>{badge.label}</span>
                 </div>
-                <p className="pendencia-card__title">{pendencia.empresaRazaoSocial}</p>
+                <p className="pendencia-card__title">
+                  {pendencia.empresaRazaoSocial || pendencia.clientePessoaFisicaNome || "—"}
+                </p>
                 <p className="pendencia-card__sub muted-react">
-                  {formatarCnpj(pendencia.empresaCnpj)} · {pendencia.templateDocumentoNome}
+                  {pendencia.empresaCnpj
+                    ? formatarCnpj(pendencia.empresaCnpj)
+                    : pendencia.clientePessoaFisicaCpf
+                      ? formatarCpf(pendencia.clientePessoaFisicaCpf)
+                      : "—"}{" "}
+                  · {pendencia.templateDocumentoNome}
                 </p>
                 <div className="pendencia-card__meta">
                   <span>

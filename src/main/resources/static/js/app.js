@@ -716,7 +716,7 @@
             idEl.textContent = `#${p.id}`;
             const emp = document.createElement("h3");
             emp.className = "pendencia-card__empresa";
-            emp.textContent = p.empresaRazaoSocial || "—";
+            emp.textContent = p.empresaRazaoSocial || p.clientePessoaFisicaNome || "—";
             const badgeWrap = document.createElement("span");
             badgeWrap.className = "pendencia-card__badge-wrap";
             const st = pendenciaStatusContadorBadge(p.status);
@@ -739,8 +739,13 @@
             venP.innerHTML = `<span class="pendencia-card__meta-lbl">Vencimento</span><span class="pendencia-card__meta-val">${escapeHtml(p.vencimento || "—")}</span>`;
             const cnpjP = document.createElement("p");
             cnpjP.className = "pendencia-card__meta-item";
-            const cnpjFmt = p.empresaCnpj ? formatarCnpj(String(p.empresaCnpj).replace(/\D/g, "")) : "—";
-            cnpjP.innerHTML = `<span class="pendencia-card__meta-lbl">CNPJ</span><span class="pendencia-card__meta-val">${escapeHtml(cnpjFmt)}</span>`;
+            const docLbl = p.empresaCnpj ? "CNPJ" : "CPF";
+            const docVal = p.empresaCnpj
+                ? formatarCnpj(String(p.empresaCnpj).replace(/\D/g, ""))
+                : p.clientePessoaFisicaCpf
+                  ? formatarCpf(String(p.clientePessoaFisicaCpf).replace(/\D/g, ""))
+                  : "—";
+            cnpjP.innerHTML = `<span class="pendencia-card__meta-lbl">${docLbl}</span><span class="pendencia-card__meta-val">${escapeHtml(docVal)}</span>`;
             meta.appendChild(docP);
             meta.appendChild(venP);
             meta.appendChild(cnpjP);
@@ -1510,8 +1515,10 @@
             docsValidadosClienteEmpresa.classList.remove("hidden");
             if (data && data.cnpj && data.razaoSocial) {
                 docsValidadosClienteEmpresa.textContent = `CNPJ: ${formatarCnpj(data.cnpj)} — ${data.razaoSocial}`;
+            } else if (data && data.cpfClientePf && data.nomeClientePf) {
+                docsValidadosClienteEmpresa.textContent = `CPF: ${formatarCpf(data.cpfClientePf)} — ${data.nomeClientePf}`;
             } else {
-                docsValidadosClienteEmpresa.textContent = "Nenhuma empresa vinculada ao seu usuário.";
+                docsValidadosClienteEmpresa.textContent = "Nenhum tomador vinculado ao seu usuário.";
             }
         }
     }
@@ -2077,6 +2084,7 @@
                 headers: headers({ "Content-Type": "application/json" }),
                 body: JSON.stringify({
                     empresaId: Number(templateEmpresaEl.value),
+                    clientePessoaFisicaId: null,
                     nome: document.getElementById("template-nome").value.trim(),
                     obrigatorio: document.getElementById("template-obrigatorio").checked,
                 }),

@@ -7,6 +7,9 @@ public record DocumentosValidadosAgrupadosResponse(
         Long empresaId,
         String cnpj,
         String razaoSocial,
+        Long clientePessoaFisicaId,
+        String cpfClientePf,
+        String nomeClientePf,
         List<AbaDocumentosResponse> abas
 ) {
 

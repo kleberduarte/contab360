@@ -85,6 +85,7 @@ public class PendenciaDocumentoController {
             @RequestParam Integer ano,
             @RequestParam Integer mes,
             @RequestParam(required = false) Long empresaId,
+            @RequestParam(required = false) Long clientePessoaFisicaId,
             @RequestParam(required = false) PendenciaStatus status,
             @RequestParam(defaultValue = "false") boolean incluirArquivadas
     ) {
@@ -93,7 +94,7 @@ public class PendenciaDocumentoController {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
         List<PendenciaDocumento> pendencias = pendenciaDocumentoService.listar(
-                ano, mes, empresaId, status, usuario, incluirArquivadas
+                ano, mes, empresaId, clientePessoaFisicaId, status, usuario, incluirArquivadas
         );
         Map<Long, String> observacoes = mapearObservacoes(pendencias);
         return pendencias.stream()
@@ -170,6 +171,9 @@ public class PendenciaDocumentoController {
             Long empresaId,
             String empresaRazaoSocial,
             String empresaCnpj,
+            Long clientePessoaFisicaId,
+            String clientePessoaFisicaNome,
+            String clientePessoaFisicaCpf,
             Long templateDocumentoId,
             String templateDocumentoNome,
             Integer competenciaAno,
@@ -179,11 +183,22 @@ public class PendenciaDocumentoController {
             String observacaoAnalise
     ) {
         public static PendenciaResponse fromEntity(PendenciaDocumento pendencia, String observacaoAnalise) {
+            Long empresaId = pendencia.getEmpresa() != null ? pendencia.getEmpresa().getId() : null;
+            String razao = pendencia.getEmpresa() != null ? pendencia.getEmpresa().getRazaoSocial() : null;
+            String cnpj = pendencia.getEmpresa() != null ? pendencia.getEmpresa().getCnpj() : null;
+            Long clientePfId =
+                    pendencia.getClientePessoaFisica() != null ? pendencia.getClientePessoaFisica().getId() : null;
+            String nomePf =
+                    pendencia.getClientePessoaFisica() != null ? pendencia.getClientePessoaFisica().getNomeCompleto() : null;
+            String cpfPf = pendencia.getClientePessoaFisica() != null ? pendencia.getClientePessoaFisica().getCpf() : null;
             return new PendenciaResponse(
                     pendencia.getId(),
-                    pendencia.getEmpresa().getId(),
-                    pendencia.getEmpresa().getRazaoSocial(),
-                    pendencia.getEmpresa().getCnpj(),
+                    empresaId,
+                    razao,
+                    cnpj,
+                    clientePfId,
+                    nomePf,
+                    cpfPf,
                     pendencia.getTemplateDocumento().getId(),
                     pendencia.getTemplateDocumento().getNome(),
                     pendencia.getCompetencia().getAno(),

@@ -9,9 +9,17 @@ type Empresa = {
   ativo?: boolean;
 };
 
+type ClientePf = {
+  id: number;
+  cpf: string;
+  nomeCompleto: string;
+  ativo?: boolean;
+};
+
 type TemplateRow = {
   id: number;
-  empresaId: number;
+  empresaId: number | null;
+  clientePessoaFisicaId: number | null;
   nome: string;
   obrigatorio: boolean;
 };
@@ -25,13 +33,27 @@ function formatarCnpj(value: string): string {
     .replace(/(\d{4})(\d)/, "$1-$2");
 }
 
+function formatarCpf(value: string): string {
+  const d = (value || "").replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
+}
+
 function empresaAtiva(e: Empresa): boolean {
   return e.ativo !== false;
 }
 
+function pfAtivo(c: ClientePf): boolean {
+  return c.ativo !== false;
+}
+
 export function TemplatesPage({ sessao }: { sessao: Sessao }) {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [empresaId, setEmpresaId] = useState("");
+  const [clientesPf, setClientesPf] = useState<ClientePf[]>([]);
+  const [tomadorTipo, setTomadorTipo] = useState<"PJ" | "PF">("PJ");
+  const [tomadorId, setTomadorId] = useState("");
   const [nome, setNome] = useState("");
   const [obrigatorio, setObrigatorio] = useState(true);
   const [lista, setLista] = useState<TemplateRow[]>([]);
@@ -46,9 +68,6 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
     try {
       const data = await apiFetchJson<Empresa[]>("/api/empresas", { sessao });
       setEmpresas(data.filter(empresaAtiva));
-      if (data.filter(empresaAtiva).length && !empresaId) {
-        setEmpresaId(String(data.filter(empresaAtiva)[0].id));
-      }
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao carregar empresas.");
       setEmpresas([]);
@@ -57,14 +76,27 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
     }
   }
 
-  async function carregarTemplates(empId: string) {
-    if (!empId) {
+  async function carregarClientesPf() {
+    try {
+      const data = await apiFetchJson<ClientePf[]>("/api/clientes-pessoa-fisica", { sessao });
+      setClientesPf(data.filter(pfAtivo));
+    } catch {
+      setClientesPf([]);
+    }
+  }
+
+  async function carregarTemplates(tipo: "PJ" | "PF", id: string) {
+    if (!id) {
       setLista([]);
       return;
     }
     setLoadingLista(true);
     try {
-      const data = await apiFetchJson<TemplateRow[]>(`/api/templates-documentos?empresaId=${empId}`, { sessao });
+      const qs =
+        tipo === "PJ"
+          ? `empresaId=${encodeURIComponent(id)}`
+          : `clientePessoaFisicaId=${encodeURIComponent(id)}`;
+      const data = await apiFetchJson<TemplateRow[]>(`/api/templates-documentos?${qs}`, { sessao });
       setLista(data);
     } catch (e) {
       setLista([]);
@@ -76,31 +108,63 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
 
   useEffect(() => {
     void carregarEmpresas();
+    void carregarClientesPf();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (empresaId) void carregarTemplates(empresaId);
-  }, [empresaId, sessao]);
+    const ativosEj = empresas.filter(empresaAtiva);
+    const ativosPf = clientesPf.filter(pfAtivo);
+    if (tomadorTipo === "PJ" && ativosEj.length && !tomadorId) {
+      setTomadorId(String(ativosEj[0].id));
+    }
+    if (tomadorTipo === "PF" && ativosPf.length && !tomadorId) {
+      setTomadorId(String(ativosPf[0].id));
+    }
+  }, [empresas, clientesPf, tomadorTipo, tomadorId]);
+
+  useEffect(() => {
+    if (tomadorId) void carregarTemplates(tomadorTipo, tomadorId);
+  }, [tomadorId, tomadorTipo, sessao]);
+
+  function onTomadorTipoChange(t: "PJ" | "PF") {
+    setTomadorTipo(t);
+    setTomadorId("");
+    setLista([]);
+  }
 
   async function onSubmit(ev: FormEvent) {
     ev.preventDefault();
     setErro("");
     setOk("");
+    if (!tomadorId) {
+      setErro("Selecione o tomador (empresa ou pessoa física).");
+      return;
+    }
     try {
+      const body =
+        tomadorTipo === "PJ"
+          ? {
+              empresaId: Number(tomadorId),
+              clientePessoaFisicaId: null,
+              nome: nome.trim(),
+              obrigatorio
+            }
+          : {
+              empresaId: null,
+              clientePessoaFisicaId: Number(tomadorId),
+              nome: nome.trim(),
+              obrigatorio
+            };
       await apiFetchJson("/api/templates-documentos", {
         method: "POST",
-        body: JSON.stringify({
-          empresaId: Number(empresaId),
-          nome: nome.trim(),
-          obrigatorio
-        }),
+        body: JSON.stringify(body),
         sessao
       });
       setOk("Template adicionado.");
       setNome("");
       setObrigatorio(true);
-      await carregarTemplates(empresaId);
+      await carregarTemplates(tomadorTipo, tomadorId);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao adicionar template.");
     }
@@ -109,32 +173,62 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
   return (
     <section className="page">
       <h2>Template de documentos</h2>
-      <p className="muted-react">Defina documentos obrigatórios ou opcionais por empresa.</p>
+      <p className="muted-react">Defina documentos por empresa (CNPJ) ou por cliente pessoa física (CPF).</p>
 
       <form className="templates-react-form" onSubmit={onSubmit}>
         <label>
-          Empresa
+          Tipo de tomador
           <select
-            value={empresaId}
-            onChange={(e) => setEmpresaId(e.target.value)}
-            required
+            value={tomadorTipo}
+            onChange={(e) => onTomadorTipoChange(e.target.value === "PF" ? "PF" : "PJ")}
             disabled={loadingEmpresas}
           >
-            <option value="">— Selecione —</option>
-            {empresas.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.razaoSocial} ({formatarCnpj(e.cnpj)})
-              </option>
-            ))}
+            <option value="PJ">Empresa (CNPJ)</option>
+            <option value="PF">Pessoa física (CPF)</option>
           </select>
         </label>
+        {tomadorTipo === "PJ" ? (
+          <label>
+            Empresa
+            <select
+              value={tomadorId}
+              onChange={(e) => setTomadorId(e.target.value)}
+              required
+              disabled={loadingEmpresas}
+            >
+              <option value="">— Selecione —</option>
+              {empresas.filter(empresaAtiva).map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.razaoSocial} ({formatarCnpj(e.cnpj)})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label>
+            Pessoa física
+            <select
+              value={tomadorId}
+              onChange={(e) => setTomadorId(e.target.value)}
+              required
+              disabled={loadingEmpresas}
+            >
+              <option value="">— Selecione —</option>
+              {clientesPf.filter(pfAtivo).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nomeCompleto} ({formatarCpf(c.cpf)})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Documento
           <input
             type="text"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
-            placeholder="Ex.: Nota fiscal"
+            placeholder="Ex.: Guia DAS, IRPF, extrato…"
             required
           />
         </label>
@@ -148,10 +242,10 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
       </form>
 
       <div className="templates-react-lista">
-        <h3>Templates da empresa selecionada</h3>
+        <h3>Templates do tomador selecionado</h3>
         {loadingLista ? <p className="muted-react">Carregando lista...</p> : null}
-        {!loadingLista && empresaId && lista.length === 0 ? (
-          <p className="muted-react">Nenhum template para esta empresa ainda.</p>
+        {!loadingLista && tomadorId && lista.length === 0 ? (
+          <p className="muted-react">Nenhum template para este tomador ainda.</p>
         ) : null}
         {lista.length > 0 ? (
           <table className="templates-react-table">

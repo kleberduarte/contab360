@@ -29,10 +29,14 @@ type PayloadValidados = {
   empresaId: number | null;
   cnpj: string | null;
   razaoSocial: string | null;
+  clientePessoaFisicaId: number | null;
+  cpfClientePf: string | null;
+  nomeClientePf: string | null;
   abas: AbaDocumentos[];
 };
 
 type EmpresaOpt = { id: number; cnpj: string; razaoSocial: string };
+type ClientePfOpt = { id: number; cpf: string; nomeCompleto: string };
 
 function formatarCnpj(digits: string): string {
   const d = digits.replace(/\D/g, "").slice(0, 14);
@@ -41,6 +45,14 @@ function formatarCnpj(digits: string): string {
     .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
     .replace(/\.(\d{3})(\d)/, ".$1/$2")
     .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+function formatarCpf(digits: string): string {
+  const d = digits.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
 }
 
 function formatarLabelCampo(chave: string): string {
@@ -332,7 +344,9 @@ function DocValidadoCard({
 export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
   const perfil = sessao.perfil;
   const [empresas, setEmpresas] = useState<EmpresaOpt[]>([]);
-  const [empresaId, setEmpresaId] = useState<string>("");
+  const [clientesPf, setClientesPf] = useState<ClientePfOpt[]>([]);
+  /** Contador: "e:{id}" empresa ou "p:{id}" pessoa física */
+  const [tomadorChave, setTomadorChave] = useState("");
   const [incluirArquivadas, setIncluirArquivadas] = useState(false);
   const [payload, setPayload] = useState<PayloadValidados | null>(null);
   const [loading, setLoading] = useState(false);
@@ -347,13 +361,26 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
     try {
       let url = "/api/inteligencia/documentos/portal/validados-por-aba";
       if (perfil === "CONTADOR") {
-        if (!empresaId) {
-          setErro("Selecione a empresa (CNPJ).");
+        if (!tomadorChave) {
+          setErro("Selecione o tomador (empresa ou pessoa física).");
           setPayload(null);
           setLoading(false);
           return;
         }
-        url += `?empresaId=${encodeURIComponent(empresaId)}&incluirCompetenciasArquivadas=${incluirArquivadas ? 1 : 0}`;
+        const sep = tomadorChave.indexOf(":");
+        const tipo = sep >= 0 ? tomadorChave.slice(0, sep) : "";
+        const id = sep >= 0 ? tomadorChave.slice(sep + 1) : "";
+        if ((tipo !== "e" && tipo !== "p") || !id) {
+          setErro("Seleção de tomador inválida.");
+          setPayload(null);
+          setLoading(false);
+          return;
+        }
+        const q =
+          tipo === "e"
+            ? `empresaId=${encodeURIComponent(id)}`
+            : `clientePessoaFisicaId=${encodeURIComponent(id)}`;
+        url += `?${q}&incluirCompetenciasArquivadas=${incluirArquivadas ? 1 : 0}`;
       }
       const data = await apiFetchJson<PayloadValidados>(url, { sessao, cache: "no-store" });
       setPayload(data);
@@ -366,30 +393,43 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
     } finally {
       setLoading(false);
     }
-  }, [perfil, empresaId, incluirArquivadas, sessao]);
+  }, [perfil, tomadorChave, incluirArquivadas, sessao]);
 
   useEffect(() => {
     if (perfil !== "CONTADOR") return;
     void (async () => {
       try {
-        const list = await apiFetchJson<EmpresaOpt[]>("/api/empresas", { sessao });
-        setEmpresas(list);
-        if (list.length > 0) {
-          setEmpresaId((prev) => prev || String(list[0].id));
-        }
+        const [listEj, listPf] = await Promise.all([
+          apiFetchJson<EmpresaOpt[]>("/api/empresas", { sessao }),
+          apiFetchJson<ClientePfOpt[]>("/api/clientes-pessoa-fisica", { sessao }).catch(() => [] as ClientePfOpt[])
+        ]);
+        setEmpresas(listEj);
+        setClientesPf(listPf);
+        setTomadorChave((prev) => {
+          if (prev) {
+            return prev;
+          }
+          if (listEj.length > 0) {
+            return `e:${listEj[0].id}`;
+          }
+          if (listPf.length > 0) {
+            return `p:${listPf[0].id}`;
+          }
+          return "";
+        });
       } catch {
         setEmpresas([]);
+        setClientesPf([]);
       }
     })();
   }, [perfil, sessao]);
 
   useEffect(() => {
     if (perfil === "CONTADOR") {
-      if (empresas.length === 0) return;
-      if (!empresaId) return;
+      if (!tomadorChave) return;
     }
     void carregar();
-  }, [perfil, empresas.length, empresaId, incluirArquivadas, carregar]);
+  }, [perfil, tomadorChave, incluirArquivadas, carregar]);
 
   const abas = payload?.abas ?? [];
   const tabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -406,17 +446,22 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
           <div className="docs-validados-toolbar-react__body">
             <div className="docs-validados-filters-react">
               <label className="docs-validados-field-react">
-                <span className="docs-validados-field-react__lbl">Empresa</span>
+                <span className="docs-validados-field-react__lbl">Tomador</span>
                 <select
-                  value={empresaId}
-                  onChange={(e) => setEmpresaId(e.target.value)}
-                  disabled={!empresas.length}
-                  aria-label="Filtrar por empresa"
+                  value={tomadorChave}
+                  onChange={(e) => setTomadorChave(e.target.value)}
+                  disabled={!empresas.length && !clientesPf.length}
+                  aria-label="Filtrar por empresa ou pessoa física"
                 >
                   <option value="">Selecione...</option>
                   {empresas.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {formatarCnpj(e.cnpj)} — {e.razaoSocial}
+                    <option key={`e-${e.id}`} value={`e:${e.id}`}>
+                      PJ: {e.razaoSocial} ({formatarCnpj(e.cnpj)})
+                    </option>
+                  ))}
+                  {clientesPf.map((c) => (
+                    <option key={`p-${c.id}`} value={`p:${c.id}`}>
+                      PF: {c.nomeCompleto} ({formatarCpf(c.cpf)})
                     </option>
                   ))}
                 </select>
@@ -439,12 +484,28 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
     }
     const cnpj = payload?.cnpj;
     const razao = payload?.razaoSocial;
+    const cpf = payload?.cpfClientePf;
+    const nomePf = payload?.nomeClientePf;
+    if (cnpj && razao) {
+      return (
+        <p className="muted-react docs-validados-cliente-empresa-react" role="status">
+          CNPJ: {formatarCnpj(cnpj)} — {razao}
+        </p>
+      );
+    }
+    if (cpf && nomePf) {
+      return (
+        <p className="muted-react docs-validados-cliente-empresa-react" role="status">
+          CPF: {formatarCpf(cpf)} — {nomePf}
+        </p>
+      );
+    }
     return (
       <p className="muted-react docs-validados-cliente-empresa-react" role="status">
-        {cnpj && razao ? `CNPJ: ${formatarCnpj(cnpj)} — ${razao}` : "Nenhuma empresa vinculada ao seu usuário."}
+        Nenhum tomador (empresa ou PF) vinculado ao seu usuário.
       </p>
     );
-  }, [perfil, empresas, empresaId, incluirArquivadas, carregar, payload]);
+  }, [perfil, empresas, clientesPf, tomadorChave, incluirArquivadas, carregar, payload]);
 
   const totalAbas = abas.length;
 
@@ -459,7 +520,7 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
           <summary className="docs-validados-help-react__summary">Mais informações</summary>
           <p className="docs-validados-help-react__body muted-react">
             Holerites com captura completa exibem proventos, descontos e bases em destaque. No perfil contador, escolha o
-            CNPJ e marque <strong>competências arquivadas</strong> se quiser incluir meses já encerrados.
+            tomador (PJ ou PF) e marque <strong>competências arquivadas</strong> se quiser incluir meses já encerrados.
           </p>
         </details>
       </header>
@@ -480,8 +541,8 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
         </p>
       ) : null}
 
-      {perfil === "CONTADOR" && empresas.length === 0 && !loading ? (
-        <p className="muted-react">Cadastre uma empresa para visualizar os documentos por CNPJ.</p>
+      {perfil === "CONTADOR" && empresas.length === 0 && clientesPf.length === 0 && !loading ? (
+        <p className="muted-react">Cadastre uma empresa ou um cliente PF para visualizar os documentos validados.</p>
       ) : null}
 
       {payload && totalAbas > 0 ? (

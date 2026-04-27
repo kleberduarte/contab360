@@ -1,5 +1,6 @@
 package com.contabilidade.pj.auth.entity;
 
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
 import com.contabilidade.pj.empresa.entity.Empresa;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,6 +38,10 @@ public class Usuario {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_pessoa_fisica_id")
+    private ClientePessoaFisica clientePessoaFisica;
 
     @Column(nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean ativo = true;
@@ -86,6 +91,14 @@ public class Usuario {
 
     public void setEmpresa(Empresa empresa) {
         this.empresa = empresa;
+    }
+
+    public ClientePessoaFisica getClientePessoaFisica() {
+        return clientePessoaFisica;
+    }
+
+    public void setClientePessoaFisica(ClientePessoaFisica clientePessoaFisica) {
+        this.clientePessoaFisica = clientePessoaFisica;
     }
 
     public boolean isAtivo() {

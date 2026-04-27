@@ -9,6 +9,7 @@ import {
   DashboardPage,
   DocsValidadosPage,
   EmpresasPage,
+  ClientesPfPage,
   FiscalAlertasPage,
   FiscalCadastrosPage,
   FiscalCertificadosPage,
@@ -191,6 +192,14 @@ function AppShell({ sessao, onLogout, onNomeAtualizado }: { sessao: Sessao; onLo
               element={
                 <GuardContador sessao={sessao}>
                   <EmpresasPage sessao={sessao} />
+                </GuardContador>
+              }
+            />
+            <Route
+              path="/clientes-pf"
+              element={
+                <GuardContador sessao={sessao}>
+                  <ClientesPfPage sessao={sessao} />
                 </GuardContador>
               }
             />
@@ -457,6 +466,7 @@ function getLinkGroupsByPerfil(perfil: PerfilUsuario): LinkGroup[] {
         { path: "/dashboard", label: "Dashboard", icon: "home" },
         { path: "/empresas", label: "Empresas", icon: "building" },
         { path: "/usuarios", label: "Usuários", icon: "users" },
+        { path: "/clientes-pf", label: "Pessoa fisica", icon: "id" },
         { path: "/templates", label: "Templates", icon: "template" },
         { path: "/pendencias", label: "Pendencias", icon: "tasks" }
       ]

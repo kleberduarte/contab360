@@ -1,5 +1,6 @@
 package com.contabilidade.pj.pendencia.entity;
 
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
 import com.contabilidade.pj.empresa.entity.Empresa;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,9 +28,13 @@ public class TemplateDocumento {
     @Column(nullable = false)
     private boolean obrigatorio = true;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "empresa_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "empresa_id")
     private Empresa empresa;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_pessoa_fisica_id")
+    private ClientePessoaFisica clientePessoaFisica;
 
     public Long getId() {
         return id;
@@ -57,5 +62,13 @@ public class TemplateDocumento {
 
     public void setEmpresa(Empresa empresa) {
         this.empresa = empresa;
+    }
+
+    public ClientePessoaFisica getClientePessoaFisica() {
+        return clientePessoaFisica;
+    }
+
+    public void setClientePessoaFisica(ClientePessoaFisica clientePessoaFisica) {
+        this.clientePessoaFisica = clientePessoaFisica;
     }
 }

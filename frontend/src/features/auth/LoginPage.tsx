@@ -13,6 +13,8 @@ type LoginResponse = {
   email: string;
   perfil: string;
   senhaTempAtiva?: boolean;
+  empresaId?: number | null;
+  clientePessoaFisicaId?: number | null;
 };
 
 function loginResponseToSessao(data: LoginResponse): Sessao {
@@ -25,7 +27,9 @@ function loginResponseToSessao(data: LoginResponse): Sessao {
     usuarioNome: data.nome ?? "",
     usuarioEmail: data.email ?? "",
     perfil,
-    senhaTempAtiva: data.senhaTempAtiva === true
+    senhaTempAtiva: data.senhaTempAtiva === true,
+    empresaId: data.empresaId ?? null,
+    clientePessoaFisicaId: data.clientePessoaFisicaId ?? null
   };
 }
 

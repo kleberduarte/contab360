@@ -8,6 +8,10 @@ export const EmpresasPage = lazy(() =>
   import("../features/empresas/EmpresasPage").then((m) => ({ default: m.EmpresasPage }))
 );
 
+export const ClientesPfPage = lazy(() =>
+  import("../features/clientesPf/ClientesPfPage").then((m) => ({ default: m.ClientesPfPage }))
+);
+
 export const PendenciasPage = lazy(() =>
   import("../features/pendencias/PendenciasPage").then((m) => ({ default: m.PendenciasPage }))
 );
