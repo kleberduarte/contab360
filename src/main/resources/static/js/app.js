@@ -2184,34 +2184,77 @@
         ev.preventDefault();
         setFeedback(uploadFeedback, "", null);
 
-        const arquivo = document.getElementById("upload-arquivo").files[0];
-        if (!arquivo) {
-            setFeedback(uploadFeedback, "Selecione um arquivo.", "err");
+        const fileInput = document.getElementById("upload-arquivo");
+        const arquivos = Array.from(fileInput.files || []).filter(Boolean);
+        if (!arquivos.length) {
+            setFeedback(uploadFeedback, "Selecione pelo menos um arquivo.", "err");
+            return;
+        }
+        if (arquivos.length > 25) {
+            setFeedback(uploadFeedback, "No máximo 25 arquivos por envio.", "err");
             return;
         }
 
         const fd = new FormData();
-        fd.append("arquivo", arquivo);
         const obs = document.getElementById("upload-observacao").value.trim();
         if (obs) fd.append("observacao", obs);
+        const umArquivo = arquivos.length === 1;
+        if (umArquivo) {
+            fd.append("arquivo", arquivos[0]);
+        } else {
+            arquivos.forEach((f) => fd.append("arquivos", f));
+        }
+
+        const uploadUrl = umArquivo
+            ? `/api/pendencias/${uploadPendenciaEl.value}/entregas`
+            : `/api/pendencias/${uploadPendenciaEl.value}/entregas/lote`;
 
         try {
-            const res = await fetch(`/api/pendencias/${uploadPendenciaEl.value}/entregas`, {
+            const controller = new AbortController();
+            const t = window.setTimeout(() => controller.abort(), umArquivo ? 25000 : 120000);
+            const res = await fetch(uploadUrl, {
                 method: "POST",
                 headers: headers(),
                 body: fd,
+                signal: controller.signal,
             });
+            window.clearTimeout(t);
             const text = await res.text();
             let data = null;
             try { data = text ? JSON.parse(text) : null; } catch {}
             if (!res.ok) throw new Error((data && data.message) || "Erro no upload.");
 
             uploadForm.reset();
-            setFeedback(uploadFeedback, "Documento enviado e pendência marcada como ENVIADO.", "ok");
+            if (umArquivo) {
+                setFeedback(uploadFeedback, "Documento enviado e pendência marcada como ENVIADO.", "ok");
+            } else {
+                const nOk = data && Array.isArray(data.entregas) ? data.entregas.length : 0;
+                const errs = data && Array.isArray(data.erros) ? data.erros : [];
+                let msg =
+                    (data && data.message) ||
+                    (errs.length ? `${nOk} enviado(s); alguns falharam.` : `${nOk} documento(s) enviado(s) e pendência marcada como ENVIADO.`);
+                if (errs.length && res.status === 200) {
+                    const det = errs
+                        .slice(0, 6)
+                        .map((e) => `${e.nomeArquivoOriginal}: ${e.mensagem}`)
+                        .join(" · ");
+                    msg = `${msg} ${det}${errs.length > 6 ? " · …" : ""}`;
+                }
+                setFeedback(uploadFeedback, msg, errs.length && nOk === 0 ? "err" : "ok");
+                if (errs.length && nOk === 0) {
+                    await carregarPendenciasCliente();
+                    await carregarDocumentosValidadosPorAba();
+                    return;
+                }
+            }
             await carregarPendenciasCliente();
             await carregarDocumentosValidadosPorAba();
         } catch (e) {
-            setFeedback(uploadFeedback, e.message || "Erro no upload.", "err");
+            const msg =
+                e && e.name === "AbortError"
+                    ? "Tempo limite do envio esgotado. Tente menos arquivos ou tamanhos menores."
+                    : e.message || "Erro no upload.";
+            setFeedback(uploadFeedback, msg, "err");
         }
     });
 

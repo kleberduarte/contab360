@@ -66,17 +66,26 @@ export async function apiFetchJson<T>(url: string, options: RequestOptions = {})
 }
 
 /** POST multipart/form-data (não define Content-Type — o browser define boundary). */
-export async function apiFetchFormData<T>(url: string, formData: FormData, sessao: Sessao | null): Promise<T> {
+export async function apiFetchFormData<T>(
+  url: string,
+  formData: FormData,
+  sessao: Sessao | null,
+  timeoutMs: number = REQUEST_TIMEOUT_MS
+): Promise<T> {
   const headers = new Headers();
   if (sessao?.token) {
     headers.set("Authorization", `Bearer ${sessao.token}`);
   }
-  const response = await fetchWithTimeout(API_BASE + url, {
-    method: "POST",
-    body: formData,
-    headers,
-    cache: "no-store"
-  });
+  const response = await fetchWithTimeout(
+    API_BASE + url,
+    {
+      method: "POST",
+      body: formData,
+      headers,
+      cache: "no-store"
+    },
+    timeoutMs
+  );
   const text = await response.text();
   if (!response.ok) {
     if (response.status === 401) {
