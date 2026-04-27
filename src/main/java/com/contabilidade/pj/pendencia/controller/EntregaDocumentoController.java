@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.contabilidade.pj.pendencia.service.*;
 import com.contabilidade.pj.pendencia.entity.*;
-import com.contabilidade.pj.pendencia.repository.*;
 
 @RestController
 @RequestMapping("/api/pendencias/{pendenciaId}/entregas")
@@ -52,6 +51,50 @@ public class EntregaDocumentoController {
         EntregaDocumento entrega = entregaDocumentoService.anexar(pendenciaId, arquivo, observacao, usuario);
         return ResponseEntity.status(HttpStatus.CREATED).body(EntregaDocumentoResponse.fromEntity(entrega));
     }
+
+    @PostMapping(value = "/lote", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<EntregaLoteHttpResponse> anexarLote(
+            @PathVariable Long pendenciaId,
+            @RequestParam("arquivos") List<MultipartFile> arquivos,
+            @RequestParam(value = "observacao", required = false) String observacao
+    ) {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        EntregaLoteResultado resultado = entregaDocumentoService.anexarLote(pendenciaId, arquivos, observacao, usuario);
+        EntregaLoteHttpResponse body = EntregaLoteHttpResponse.from(resultado);
+        if (body.entregas().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        }
+        if (body.erros().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
+        }
+        return ResponseEntity.status(HttpStatus.OK).body(body);
+    }
+
+    public record EntregaLoteHttpResponse(
+            List<EntregaDocumentoResponse> entregas,
+            List<LoteArquivoErroResponse> erros,
+            String message
+    ) {
+        static EntregaLoteHttpResponse from(EntregaLoteResultado r) {
+            List<EntregaDocumentoResponse> ents =
+                    r.sucesso().stream().map(EntregaDocumentoResponse::fromEntity).toList();
+            List<LoteArquivoErroResponse> errs = r.falhas().stream()
+                    .map(f -> new LoteArquivoErroResponse(f.nomeArquivoOriginal(), f.mensagem()))
+                    .toList();
+            String msg = null;
+            if (ents.isEmpty() && !errs.isEmpty()) {
+                msg = "Nenhum arquivo foi aceito.";
+            } else if (!ents.isEmpty() && !errs.isEmpty()) {
+                msg = errs.size() + " arquivo(s) com falha; " + ents.size() + " enviado(s) com sucesso.";
+            }
+            return new EntregaLoteHttpResponse(ents, errs, msg);
+        }
+    }
+
+    public record LoteArquivoErroResponse(String nomeArquivoOriginal, String mensagem) {}
 
     public record EntregaDocumentoResponse(
             Long id,
