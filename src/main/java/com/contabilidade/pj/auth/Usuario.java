@@ -1,5 +1,6 @@
 package com.contabilidade.pj.auth;
 
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
 import com.contabilidade.pj.empresa.Empresa;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,6 +38,10 @@ public class Usuario {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_pessoa_fisica_id")
+    private ClientePessoaFisica clientePessoaFisica;
 
     public Long getId() {
         return id;
@@ -80,5 +85,13 @@ public class Usuario {
 
     public void setEmpresa(Empresa empresa) {
         this.empresa = empresa;
+    }
+
+    public ClientePessoaFisica getClientePessoaFisica() {
+        return clientePessoaFisica;
+    }
+
+    public void setClientePessoaFisica(ClientePessoaFisica clientePessoaFisica) {
+        this.clientePessoaFisica = clientePessoaFisica;
     }
 }

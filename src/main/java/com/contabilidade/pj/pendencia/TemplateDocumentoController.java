@@ -4,7 +4,6 @@ import com.contabilidade.pj.auth.AuthContext;
 import com.contabilidade.pj.auth.Usuario;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,14 +27,24 @@ public class TemplateDocumentoController {
     }
 
     @GetMapping
-    public List<TemplateDocumentoResponse> listar(@RequestParam Long empresaId) {
+    public List<TemplateDocumentoResponse> listar(
+            @RequestParam(required = false) Long empresaId,
+            @RequestParam(required = false) Long clientePessoaFisicaId
+    ) {
         Usuario usuario = AuthContext.get();
         if (usuario == null) {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
-        return templateDocumentoService.listarPorEmpresa(empresaId, usuario).stream()
-                .map(TemplateDocumentoResponse::fromEntity)
-                .toList();
+        if (empresaId != null && clientePessoaFisicaId != null) {
+            throw new IllegalArgumentException("Informe apenas empresaId ou clientePessoaFisicaId.");
+        }
+        if (empresaId == null && clientePessoaFisicaId == null) {
+            throw new IllegalArgumentException("Informe empresaId ou clientePessoaFisicaId.");
+        }
+        List<TemplateDocumento> lista = empresaId != null
+                ? templateDocumentoService.listarPorEmpresa(empresaId, usuario)
+                : templateDocumentoService.listarPorClientePessoaFisica(clientePessoaFisicaId, usuario);
+        return lista.stream().map(TemplateDocumentoResponse::fromEntity).toList();
     }
 
     @PostMapping
@@ -44,12 +53,19 @@ public class TemplateDocumentoController {
         if (usuario == null) {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
-        TemplateDocumento salvo = templateDocumentoService.criar(req.empresaId(), req.nome(), req.obrigatorio(), usuario);
+        TemplateDocumento salvo = templateDocumentoService.criar(
+                req.empresaId(),
+                req.clientePessoaFisicaId(),
+                req.nome(),
+                req.obrigatorio(),
+                usuario
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(TemplateDocumentoResponse.fromEntity(salvo));
     }
 
     public record CriarTemplateDocumentoRequest(
-            @NotNull Long empresaId,
+            Long empresaId,
+            Long clientePessoaFisicaId,
             @NotBlank String nome,
             boolean obrigatorio
     ) {
@@ -58,13 +74,15 @@ public class TemplateDocumentoController {
     public record TemplateDocumentoResponse(
             Long id,
             Long empresaId,
+            Long clientePessoaFisicaId,
             String nome,
             boolean obrigatorio
     ) {
         public static TemplateDocumentoResponse fromEntity(TemplateDocumento template) {
             return new TemplateDocumentoResponse(
                     template.getId(),
-                    template.getEmpresa().getId(),
+                    template.getEmpresa() != null ? template.getEmpresa().getId() : null,
+                    template.getClientePessoaFisica() != null ? template.getClientePessoaFisica().getId() : null,
                     template.getNome(),
                     template.isObrigatorio()
             );

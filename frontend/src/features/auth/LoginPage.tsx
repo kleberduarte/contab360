@@ -12,6 +12,8 @@ type LoginResponse = {
   nome: string;
   email: string;
   perfil: string;
+  empresaId?: number | null;
+  clientePessoaFisicaId?: number | null;
 };
 
 function loginResponseToSessao(data: LoginResponse): Sessao {
@@ -23,7 +25,9 @@ function loginResponseToSessao(data: LoginResponse): Sessao {
     token: data.token,
     usuarioNome: data.nome ?? "",
     usuarioEmail: data.email ?? "",
-    perfil
+    perfil,
+    empresaId: data.empresaId ?? null,
+    clientePessoaFisicaId: data.clientePessoaFisicaId ?? null
   };
 }
 

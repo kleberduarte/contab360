@@ -2,6 +2,8 @@ package com.contabilidade.pj.pendencia;
 
 import com.contabilidade.pj.auth.PerfilUsuario;
 import com.contabilidade.pj.auth.Usuario;
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
+import com.contabilidade.pj.clientepf.ClientePessoaFisicaRepository;
 import com.contabilidade.pj.empresa.Empresa;
 import com.contabilidade.pj.empresa.EmpresaRepository;
 import com.contabilidade.pj.pendencia.holerite.HoleriteDetalhado;
@@ -75,6 +77,7 @@ public class DocumentoInteligenciaService {
     private final RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository;
     private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
     private final EmpresaRepository empresaRepository;
+    private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final CompetenciaArquivamentoService competenciaArquivamentoService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -85,6 +88,7 @@ public class DocumentoInteligenciaService {
             RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository,
             PendenciaDocumentoRepository pendenciaDocumentoRepository,
             EmpresaRepository empresaRepository,
+            ClientePessoaFisicaRepository clientePessoaFisicaRepository,
             CompetenciaArquivamentoService competenciaArquivamentoService
     ) {
         this.documentoProcessamentoRepository = documentoProcessamentoRepository;
@@ -93,6 +97,7 @@ public class DocumentoInteligenciaService {
         this.revisaoDocumentoHistoricoRepository = revisaoDocumentoHistoricoRepository;
         this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
         this.empresaRepository = empresaRepository;
+        this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
         this.competenciaArquivamentoService = competenciaArquivamentoService;
     }
 
@@ -209,11 +214,9 @@ public class DocumentoInteligenciaService {
         }
         PendenciaDocumento pendencia = pendenciaDocumentoRepository.findById(pendenciaId)
                 .orElseThrow(() -> new IllegalArgumentException("Pendência não encontrada."));
-        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
-            if (usuarioAtual.getEmpresa() == null
-                    || !usuarioAtual.getEmpresa().getId().equals(pendencia.getEmpresa().getId())) {
-                throw new IllegalArgumentException("Cliente sem acesso a esta pendência.");
-            }
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE
+                && !PendenciaClienteDono.clienteEhDonoDaPendencia(usuarioAtual, pendencia)) {
+            throw new IllegalArgumentException("Cliente sem acesso a esta pendência.");
         }
         DocumentoProcessamento processamento = documentoProcessamentoRepository
                 .findTopByEntregaPendenciaIdOrderByAtualizadoEmDesc(pendenciaId)
@@ -291,47 +294,137 @@ public class DocumentoInteligenciaService {
     public DocumentosValidadosAgrupadosResponse listarDocumentosValidadosPorAba(
             Usuario usuarioAtual,
             Long empresaIdParam,
+            Long clientePessoaFisicaIdParam,
             boolean incluirCompetenciasArquivadas
     ) {
         if (usuarioAtual == null) {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
-        Long empresaIdResolvida;
+        if (empresaIdParam != null && clientePessoaFisicaIdParam != null) {
+            throw new IllegalArgumentException("Informe apenas empresaId ou clientePessoaFisicaId.");
+        }
         if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
-            if (usuarioAtual.getEmpresa() == null) {
-                return abasVaziasComEmpresa(null, null, null);
+            if (usuarioAtual.getEmpresa() != null) {
+                Long id = usuarioAtual.getEmpresa().getId();
+                if (empresaIdParam != null && !empresaIdParam.equals(id)) {
+                    throw new IllegalArgumentException("Empresa inválida para este usuário.");
+                }
+                if (clientePessoaFisicaIdParam != null) {
+                    throw new IllegalArgumentException("Parâmetro clientePessoaFisicaId não se aplica a este usuário.");
+                }
+                Empresa empresa = empresaRepository.findById(id)
+                        .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
+                List<DocumentoProcessamento> processamentos = carregarProcessamentosPj(
+                        usuarioAtual.getPerfil(), empresa.getId(), incluirCompetenciasArquivadas);
+                return montarDocumentosValidadosPorAba(
+                        empresa.getId(),
+                        empresa.getCnpj(),
+                        empresa.getRazaoSocial(),
+                        null,
+                        null,
+                        null,
+                        processamentos
+                );
             }
-            empresaIdResolvida = usuarioAtual.getEmpresa().getId();
-            if (empresaIdParam != null && !empresaIdParam.equals(empresaIdResolvida)) {
-                throw new IllegalArgumentException("Empresa inválida para este usuário.");
+            if (usuarioAtual.getClientePessoaFisica() != null) {
+                Long id = usuarioAtual.getClientePessoaFisica().getId();
+                if (clientePessoaFisicaIdParam != null && !clientePessoaFisicaIdParam.equals(id)) {
+                    throw new IllegalArgumentException("Cadastro PF inválido para este usuário.");
+                }
+                if (empresaIdParam != null) {
+                    throw new IllegalArgumentException("Parâmetro empresaId não se aplica a este usuário.");
+                }
+                ClientePessoaFisica pf = clientePessoaFisicaRepository.findById(id)
+                        .orElseThrow(() -> new IllegalArgumentException("Cadastro PF não encontrado."));
+                List<DocumentoProcessamento> processamentos = carregarProcessamentosPf(
+                        usuarioAtual.getPerfil(), pf.getId(), incluirCompetenciasArquivadas);
+                return montarDocumentosValidadosPorAba(
+                        null,
+                        null,
+                        null,
+                        pf.getId(),
+                        pf.getCpf(),
+                        pf.getNomeCompleto(),
+                        processamentos
+                );
             }
-        } else if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR) {
-            if (empresaIdParam == null) {
-                throw new IllegalArgumentException("Informe a empresa (parâmetro empresaId).");
-            }
-            empresaIdResolvida = empresaIdParam;
-        } else {
+            return abasVaziasTomador(null, null, null, null, null, null);
+        }
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
             throw new IllegalArgumentException("Perfil não autorizado a este recurso.");
         }
-
-        Empresa empresa = empresaRepository.findById(empresaIdResolvida)
-                .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
-        List<DocumentoProcessamento> processamentos;
-        if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR && !incluirCompetenciasArquivadas) {
-            processamentos = documentoProcessamentoRepository.findByEmpresaIdAndStatusExcluindoCompetenciaArquivada(
+        if (empresaIdParam != null) {
+            Empresa empresa = empresaRepository.findById(empresaIdParam)
+                    .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
+            List<DocumentoProcessamento> processamentos = carregarProcessamentosPj(
+                    PerfilUsuario.CONTADOR, empresa.getId(), incluirCompetenciasArquivadas);
+            return montarDocumentosValidadosPorAba(
                     empresa.getId(),
-                    ProcessamentoStatus.PROCESSADO
+                    empresa.getCnpj(),
+                    empresa.getRazaoSocial(),
+                    null,
+                    null,
+                    null,
+                    processamentos
             );
-        } else {
-            processamentos = documentoProcessamentoRepository.findByEmpresaIdAndStatus(
-                    empresa.getId(),
+        }
+        if (clientePessoaFisicaIdParam != null) {
+            ClientePessoaFisica pf = clientePessoaFisicaRepository.findById(clientePessoaFisicaIdParam)
+                    .orElseThrow(() -> new IllegalArgumentException("Cadastro PF não encontrado."));
+            List<DocumentoProcessamento> processamentos = carregarProcessamentosPf(
+                    PerfilUsuario.CONTADOR, pf.getId(), incluirCompetenciasArquivadas);
+            return montarDocumentosValidadosPorAba(
+                    null,
+                    null,
+                    null,
+                    pf.getId(),
+                    pf.getCpf(),
+                    pf.getNomeCompleto(),
+                    processamentos
+            );
+        }
+        throw new IllegalArgumentException("Informe empresaId ou clientePessoaFisicaId.");
+    }
+
+    private List<DocumentoProcessamento> carregarProcessamentosPj(
+            PerfilUsuario perfil,
+            Long empresaId,
+            boolean incluirCompetenciasArquivadas
+    ) {
+        if (perfil == PerfilUsuario.CONTADOR && !incluirCompetenciasArquivadas) {
+            return documentoProcessamentoRepository.findByEmpresaIdAndStatusExcluindoCompetenciaArquivada(
+                    empresaId,
                     ProcessamentoStatus.PROCESSADO
             );
         }
-        return montarDocumentosValidadosPorAba(empresa.getId(), empresa.getCnpj(), empresa.getRazaoSocial(), processamentos);
+        return documentoProcessamentoRepository.findByEmpresaIdAndStatus(empresaId, ProcessamentoStatus.PROCESSADO);
     }
 
-    private static DocumentosValidadosAgrupadosResponse abasVaziasComEmpresa(Long empresaId, String cnpj, String razaoSocial) {
+    private List<DocumentoProcessamento> carregarProcessamentosPf(
+            PerfilUsuario perfil,
+            Long clientePfId,
+            boolean incluirCompetenciasArquivadas
+    ) {
+        if (perfil == PerfilUsuario.CONTADOR && !incluirCompetenciasArquivadas) {
+            return documentoProcessamentoRepository.findByClientePessoaFisicaIdAndStatusExcluindoCompetenciaArquivada(
+                    clientePfId,
+                    ProcessamentoStatus.PROCESSADO
+            );
+        }
+        return documentoProcessamentoRepository.findByClientePessoaFisicaIdAndStatus(
+                clientePfId,
+                ProcessamentoStatus.PROCESSADO
+        );
+    }
+
+    private static DocumentosValidadosAgrupadosResponse abasVaziasTomador(
+            Long empresaId,
+            String cnpj,
+            String razaoSocial,
+            Long clientePessoaFisicaId,
+            String cpfClientePf,
+            String nomeClientePf
+    ) {
         List<DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse> abas = TipoDocumentoAba.ordemAbas().stream()
                 .map(id -> new DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse(
                         id,
@@ -339,13 +432,24 @@ public class DocumentoInteligenciaService {
                         List.of()
                 ))
                 .toList();
-        return new DocumentosValidadosAgrupadosResponse(empresaId, cnpj, razaoSocial, abas);
+        return new DocumentosValidadosAgrupadosResponse(
+                empresaId,
+                cnpj,
+                razaoSocial,
+                clientePessoaFisicaId,
+                cpfClientePf,
+                nomeClientePf,
+                abas
+        );
     }
 
     private DocumentosValidadosAgrupadosResponse montarDocumentosValidadosPorAba(
             Long empresaId,
             String cnpj,
             String razaoSocial,
+            Long clientePessoaFisicaId,
+            String cpfClientePf,
+            String nomeClientePf,
             List<DocumentoProcessamento> processamentos
     ) {
         Map<String, List<DocumentosValidadosAgrupadosResponse.DocumentoValidadoItemResponse>> porAba = new LinkedHashMap<>();
@@ -382,7 +486,15 @@ public class DocumentoInteligenciaService {
                         List.copyOf(porAba.getOrDefault(id, List.of()))
                 ))
                 .toList();
-        return new DocumentosValidadosAgrupadosResponse(empresaId, cnpj, razaoSocial, abas);
+        return new DocumentosValidadosAgrupadosResponse(
+                empresaId,
+                cnpj,
+                razaoSocial,
+                clientePessoaFisicaId,
+                cpfClientePf,
+                nomeClientePf,
+                abas
+        );
     }
 
     private static String valorCampoJsonParaExibicao(JsonNode n) {
@@ -473,10 +585,9 @@ public class DocumentoInteligenciaService {
     ) {
         DocumentoProcessamento processamento = documentoProcessamentoRepository.findById(processamentoId)
                 .orElseThrow(() -> new IllegalArgumentException("Documento de processamento nao encontrado."));
-        Long empresaPendenciaId = processamento.getEntrega().getPendencia().getEmpresa().getId();
+        PendenciaDocumento pend = processamento.getEntrega().getPendencia();
         if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
-            if (usuarioAtual.getEmpresa() == null
-                    || !usuarioAtual.getEmpresa().getId().equals(empresaPendenciaId)) {
+            if (!PendenciaClienteDono.clienteEhDonoDaPendencia(usuarioAtual, pend)) {
                 throw new IllegalArgumentException("Cliente sem permissão para editar este documento.");
             }
         } else if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
@@ -1539,6 +1650,24 @@ public class DocumentoInteligenciaService {
         finalizarProcessamentoAutomatico(processamento, "PROCESSAMENTO_TEXTO");
     }
 
+    private static String somenteDigitosIdDoc(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replaceAll("\\D", "");
+    }
+
+    private List<TemplateDocumento> templatesDoTomador(PendenciaDocumento pendencia) {
+        if (pendencia.getEmpresa() != null) {
+            return templateDocumentoRepository.findByEmpresaIdOrderByNomeAsc(pendencia.getEmpresa().getId());
+        }
+        if (pendencia.getClientePessoaFisica() != null) {
+            return templateDocumentoRepository.findByClientePessoaFisicaIdOrderByNomeAsc(
+                    pendencia.getClientePessoaFisica().getId());
+        }
+        return List.of();
+    }
+
     private String validarComPendencia(
             DocumentoProcessamento processamento,
             String tipoDetectado,
@@ -1547,20 +1676,42 @@ public class DocumentoInteligenciaService {
     ) {
         PendenciaDocumento pendencia = processamento.getEntrega().getPendencia();
         String nomeTemplate = pendencia.getTemplateDocumento().getNome().toLowerCase(Locale.ROOT);
-        String cnpjEmpresa = pendencia.getEmpresa().getCnpj();
+        String doc1 = somenteDigitosIdDoc(cnpjPrincipal);
+        String doc2 = somenteDigitosIdDoc(cnpjSecundario);
 
-        boolean tipoFiscal = tipoDetectado.contains("NOTA") || tipoDetectado.contains("NFE") || tipoDetectado.contains("NFSE");
-        if (tipoFiscal) {
-            if (!cnpjPrincipal.isBlank() || !cnpjSecundario.isBlank()) {
-                boolean cnpjCompativel = cnpjEmpresa.equals(cnpjPrincipal) || cnpjEmpresa.equals(cnpjSecundario);
-                if (!cnpjCompativel) {
-                    return "CNPJ do documento difere da empresa da pendência. Revisar.";
+        boolean tipoFiscal = tipoDetectado.contains("NOTA")
+                || tipoDetectado.contains("NFE")
+                || tipoDetectado.contains("NFSE");
+
+        if (pendencia.getEmpresa() != null) {
+            String cnpjEmpresa = pendencia.getEmpresa().getCnpj();
+            if (tipoFiscal) {
+                if (!doc1.isBlank() || !doc2.isBlank()) {
+                    boolean cnpjCompativel = cnpjEmpresa.equals(doc1) || cnpjEmpresa.equals(doc2);
+                    if (!cnpjCompativel) {
+                        return "CNPJ do documento difere da empresa da pendência. Revisar.";
+                    }
                 }
+            } else if (!doc1.isBlank() && !cnpjEmpresa.equals(doc1)) {
+                return "CNPJ do documento difere da empresa da pendência. Revisar.";
+            } else if (!doc2.isBlank() && !cnpjEmpresa.equals(doc2) && doc1.isBlank()) {
+                return "CNPJ do documento difere da empresa da pendência. Revisar.";
             }
-        } else if (!cnpjPrincipal.isBlank() && !cnpjEmpresa.equals(cnpjPrincipal)) {
-            return "CNPJ do documento difere da empresa da pendência. Revisar.";
-        } else if (!cnpjSecundario.isBlank() && !cnpjEmpresa.equals(cnpjSecundario) && cnpjPrincipal.isBlank()) {
-            return "CNPJ do documento difere da empresa da pendência. Revisar.";
+        } else if (pendencia.getClientePessoaFisica() != null) {
+            String cpfTomador = pendencia.getClientePessoaFisica().getCpf();
+            if (tipoFiscal) {
+                boolean algumOnze = (doc1.length() == 11) || (doc2.length() == 11);
+                if (algumOnze) {
+                    boolean cpfCompat = cpfTomador.equals(doc1) || cpfTomador.equals(doc2);
+                    if (!cpfCompat) {
+                        return "CPF do documento fiscal não confere com o cadastro da pendência. Revisar.";
+                    }
+                }
+            } else if (!doc1.isBlank() && doc1.length() == 11 && !cpfTomador.equals(doc1)) {
+                return "CPF do documento difere do cadastro da pendência. Revisar.";
+            } else if (!doc2.isBlank() && doc2.length() == 11 && !cpfTomador.equals(doc2) && doc1.isBlank()) {
+                return "CPF do documento difere do cadastro da pendência. Revisar.";
+            }
         }
 
         boolean tipoCompativel = true;
@@ -1581,12 +1732,10 @@ public class DocumentoInteligenciaService {
             return "Tipo detectado não combina com o template da pendência. Revisar.";
         }
 
-        boolean temTemplate = templateDocumentoRepository
-                .findByEmpresaIdOrderByNomeAsc(pendencia.getEmpresa().getId())
-                .stream()
+        boolean temTemplate = templatesDoTomador(pendencia).stream()
                 .anyMatch(t -> t.getId().equals(pendencia.getTemplateDocumento().getId()));
         if (!temTemplate) {
-            return "Template não encontrado para esta empresa. Revisar.";
+            return "Template não encontrado para o tomador desta pendência. Revisar.";
         }
 
         return "";

@@ -2,6 +2,8 @@ package com.contabilidade.pj.pendencia;
 
 import com.contabilidade.pj.auth.PerfilUsuario;
 import com.contabilidade.pj.auth.Usuario;
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
+import com.contabilidade.pj.clientepf.ClientePessoaFisicaRepository;
 import com.contabilidade.pj.empresa.Empresa;
 import com.contabilidade.pj.empresa.EmpresaRepository;
 import java.time.DateTimeException;
@@ -19,6 +21,7 @@ public class PendenciaDocumentoService {
     private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
     private final TemplateDocumentoRepository templateDocumentoRepository;
     private final EmpresaRepository empresaRepository;
+    private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final CompetenciaArquivamentoService competenciaArquivamentoService;
 
     public PendenciaDocumentoService(
@@ -26,12 +29,14 @@ public class PendenciaDocumentoService {
             PendenciaDocumentoRepository pendenciaDocumentoRepository,
             TemplateDocumentoRepository templateDocumentoRepository,
             EmpresaRepository empresaRepository,
+            ClientePessoaFisicaRepository clientePessoaFisicaRepository,
             CompetenciaArquivamentoService competenciaArquivamentoService
     ) {
         this.competenciaMensalRepository = competenciaMensalRepository;
         this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
         this.templateDocumentoRepository = templateDocumentoRepository;
         this.empresaRepository = empresaRepository;
+        this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
         this.competenciaArquivamentoService = competenciaArquivamentoService;
     }
 
@@ -59,15 +64,17 @@ public class PendenciaDocumentoService {
                     return competenciaMensalRepository.save(nova);
                 });
 
-        List<Empresa> empresas = empresaRepository.findAllByAtivoTrue();
         int totalCriadas = 0;
+        LocalDate vencimento = calcularVencimento(ano, mes, diaVencimento);
 
+        List<Empresa> empresas = empresaRepository.findAllByAtivoTrue();
         for (Empresa empresa : empresas) {
             List<TemplateDocumento> templates = templateDocumentoRepository.findByEmpresaIdOrderByNomeAsc(empresa.getId());
             for (TemplateDocumento template : templates) {
+                String tomadorUid = PendenciaTomadorUids.empresa(empresa.getId());
                 boolean existe = pendenciaDocumentoRepository
-                        .findByEmpresaIdAndTemplateDocumentoIdAndCompetenciaId(
-                                empresa.getId(),
+                        .findByTomadorUidAndTemplateDocumentoIdAndCompetenciaId(
+                                tomadorUid,
                                 template.getId(),
                                 competencia.getId()
                         )
@@ -80,11 +87,39 @@ public class PendenciaDocumentoService {
                 pendencia.setTemplateDocumento(template);
                 pendencia.setCompetencia(competencia);
                 pendencia.setStatus(PendenciaStatus.PENDENTE);
-                pendencia.setVencimento(calcularVencimento(ano, mes, diaVencimento));
+                pendencia.setVencimento(vencimento);
                 pendenciaDocumentoRepository.save(pendencia);
                 totalCriadas++;
             }
         }
+
+        List<ClientePessoaFisica> clientesPf = clientePessoaFisicaRepository.findAllByAtivoTrueOrderByNomeCompletoAsc();
+        for (ClientePessoaFisica clientePf : clientesPf) {
+            List<TemplateDocumento> templates =
+                    templateDocumentoRepository.findByClientePessoaFisicaIdOrderByNomeAsc(clientePf.getId());
+            for (TemplateDocumento template : templates) {
+                String tomadorUid = PendenciaTomadorUids.clientePessoaFisica(clientePf.getId());
+                boolean existe = pendenciaDocumentoRepository
+                        .findByTomadorUidAndTemplateDocumentoIdAndCompetenciaId(
+                                tomadorUid,
+                                template.getId(),
+                                competencia.getId()
+                        )
+                        .isPresent();
+                if (existe) {
+                    continue;
+                }
+                PendenciaDocumento pendencia = new PendenciaDocumento();
+                pendencia.setClientePessoaFisica(clientePf);
+                pendencia.setTemplateDocumento(template);
+                pendencia.setCompetencia(competencia);
+                pendencia.setStatus(PendenciaStatus.PENDENTE);
+                pendencia.setVencimento(vencimento);
+                pendenciaDocumentoRepository.save(pendencia);
+                totalCriadas++;
+            }
+        }
+
         if (totalCriadas > 0) {
             competenciaArquivamentoService.sincronizarArquivamentoCompetencia(competencia.getId());
         }
@@ -96,6 +131,7 @@ public class PendenciaDocumentoService {
             Integer ano,
             Integer mes,
             Long empresaId,
+            Long clientePessoaFisicaId,
             PendenciaStatus status,
             Usuario usuarioAtual,
             boolean incluirArquivadas
@@ -105,11 +141,28 @@ public class PendenciaDocumentoService {
         }
 
         Long empresaFiltrada = empresaId;
+        Long clientePfFiltrado = clientePessoaFisicaId;
+
         if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
-            if (usuarioAtual.getEmpresa() == null) {
+            if (usuarioAtual.getEmpresa() != null) {
+                empresaFiltrada = usuarioAtual.getEmpresa().getId();
+                clientePfFiltrado = null;
+                if (empresaId != null && !empresaId.equals(empresaFiltrada)) {
+                    throw new IllegalArgumentException("Empresa inválida para este usuário.");
+                }
+            } else if (usuarioAtual.getClientePessoaFisica() != null) {
+                clientePfFiltrado = usuarioAtual.getClientePessoaFisica().getId();
+                empresaFiltrada = null;
+                if (clientePessoaFisicaId != null && !clientePessoaFisicaId.equals(clientePfFiltrado)) {
+                    throw new IllegalArgumentException("Cadastro PF inválido para este usuário.");
+                }
+            } else {
                 return List.of();
             }
-            empresaFiltrada = usuarioAtual.getEmpresa().getId();
+        } else if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR) {
+            if (empresaFiltrada != null && clientePfFiltrado != null) {
+                throw new IllegalArgumentException("Informe apenas empresaId ou clientePessoaFisicaId.");
+            }
         }
 
         if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR && !incluirArquivadas) {
@@ -118,15 +171,40 @@ public class PendenciaDocumentoService {
             }
         }
 
-        List<PendenciaDocumento> pendencias = empresaFiltrada == null
-                ? pendenciaDocumentoRepository
-                        .findByCompetenciaAnoAndCompetenciaMesOrderByEmpresaRazaoSocialAscTemplateDocumentoNomeAsc(ano, mes)
-                : pendenciaDocumentoRepository
+        List<PendenciaDocumento> pendencias;
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR) {
+            if (empresaFiltrada != null) {
+                pendencias = pendenciaDocumentoRepository
                         .findByCompetenciaAnoAndCompetenciaMesAndEmpresaIdOrderByTemplateDocumentoNomeAsc(
                                 ano,
                                 mes,
                                 empresaFiltrada
                         );
+            } else if (clientePfFiltrado != null) {
+                pendencias = pendenciaDocumentoRepository
+                        .findByCompetenciaAnoAndCompetenciaMesAndClientePfIdOrderByTemplateDocumentoNomeAsc(
+                                ano,
+                                mes,
+                                clientePfFiltrado
+                        );
+            } else {
+                pendencias = pendenciaDocumentoRepository.findByCompetenciaAnoAndMesParaContador(ano, mes);
+            }
+        } else if (empresaFiltrada != null) {
+            pendencias = pendenciaDocumentoRepository
+                    .findByCompetenciaAnoAndCompetenciaMesAndEmpresaIdOrderByTemplateDocumentoNomeAsc(
+                            ano,
+                            mes,
+                            empresaFiltrada
+                    );
+        } else {
+            pendencias = pendenciaDocumentoRepository
+                    .findByCompetenciaAnoAndCompetenciaMesAndClientePfIdOrderByTemplateDocumentoNomeAsc(
+                            ano,
+                            mes,
+                            clientePfFiltrado
+                    );
+        }
 
         if (status == null) {
             return pendencias;

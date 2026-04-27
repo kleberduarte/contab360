@@ -60,6 +60,37 @@ public interface DocumentoProcessamentoRepository extends JpaRepository<Document
             @Param("status") ProcessamentoStatus status
     );
 
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.clientePessoaFisica.id = :clientePfId
+              and dp.status = :status
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByClientePessoaFisicaIdAndStatus(
+            @Param("clientePfId") Long clientePfId,
+            @Param("status") ProcessamentoStatus status
+    );
+
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.clientePessoaFisica.id = :clientePfId
+              and dp.status = :status
+              and c.arquivada = false
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByClientePessoaFisicaIdAndStatusExcluindoCompetenciaArquivada(
+            @Param("clientePfId") Long clientePfId,
+            @Param("status") ProcessamentoStatus status
+    );
+
     interface ObservacaoPendenciaView {
         Long getPendenciaId();
         String getObservacaoProcessamento();

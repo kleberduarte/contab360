@@ -52,10 +52,9 @@ public class EntregaDocumentoService {
         PendenciaDocumento pendencia = pendenciaDocumentoRepository.findById(pendenciaId)
                 .orElseThrow(() -> new IllegalArgumentException("Pendência não encontrada."));
 
-        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
-            if (usuarioAtual.getEmpresa() == null || !usuarioAtual.getEmpresa().getId().equals(pendencia.getEmpresa().getId())) {
-                throw new IllegalArgumentException("Cliente sem acesso a esta pendência.");
-            }
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE
+                && !PendenciaClienteDono.clienteEhDonoDaPendencia(usuarioAtual, pendencia)) {
+            throw new IllegalArgumentException("Cliente sem acesso a esta pendência.");
         }
 
         String nomeOriginal = arquivo.getOriginalFilename() == null ? "arquivo.bin" : arquivo.getOriginalFilename();
@@ -110,10 +109,9 @@ public class EntregaDocumentoService {
     public List<EntregaDocumento> listarPorPendencia(Long pendenciaId, Usuario usuarioAtual) {
         PendenciaDocumento pendencia = pendenciaDocumentoRepository.findById(pendenciaId)
                 .orElseThrow(() -> new IllegalArgumentException("Pendência não encontrada."));
-        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
-            if (usuarioAtual.getEmpresa() == null || !usuarioAtual.getEmpresa().getId().equals(pendencia.getEmpresa().getId())) {
-                throw new IllegalArgumentException("Cliente sem acesso a esta pendência.");
-            }
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE
+                && !PendenciaClienteDono.clienteEhDonoDaPendencia(usuarioAtual, pendencia)) {
+            throw new IllegalArgumentException("Cliente sem acesso a esta pendência.");
         }
         return entregaDocumentoRepository.findByPendenciaIdOrderByEnviadoEmDesc(pendenciaId);
     }

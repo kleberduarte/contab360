@@ -5,6 +5,10 @@ export type Sessao = {
   usuarioNome: string;
   usuarioEmail: string;
   perfil: PerfilUsuario;
+  /** Presente quando o cliente está vinculado a uma empresa (PJ). */
+  empresaId?: number | null;
+  /** Presente quando o cliente está vinculado a um cadastro PF (IRPF etc.). */
+  clientePessoaFisicaId?: number | null;
 };
 
 const STORAGE_KEY = "contabpj_session";
@@ -29,7 +33,28 @@ export function normalizeSessao(raw: unknown): Sessao | null {
   const p = o.perfil;
   const perfil = p === "ADM" || p === "CONTADOR" || p === "CLIENTE" ? p : null;
   if (!perfil) return null;
-  return { token: o.token, usuarioNome: nome, usuarioEmail: email, perfil };
+  const empresaId =
+    typeof o.empresaId === "number"
+      ? o.empresaId
+      : typeof o.empresaId === "string" && o.empresaId !== ""
+        ? Number(o.empresaId)
+        : null;
+  const clientePessoaFisicaId =
+    typeof o.clientePessoaFisicaId === "number"
+      ? o.clientePessoaFisicaId
+      : typeof o.clientePessoaFisicaId === "string" && o.clientePessoaFisicaId !== ""
+        ? Number(o.clientePessoaFisicaId)
+        : null;
+  return {
+    token: o.token,
+    usuarioNome: nome,
+    usuarioEmail: email,
+    perfil,
+    empresaId: Number.isFinite(empresaId as number) ? (empresaId as number) : null,
+    clientePessoaFisicaId: Number.isFinite(clientePessoaFisicaId as number)
+      ? (clientePessoaFisicaId as number)
+      : null
+  };
 }
 
 export function getSessao(): Sessao | null {

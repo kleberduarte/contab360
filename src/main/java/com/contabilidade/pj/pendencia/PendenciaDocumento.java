@@ -1,5 +1,6 @@
 package com.contabilidade.pj.pendencia;
 
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
 import com.contabilidade.pj.empresa.Empresa;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,6 +12,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
@@ -18,7 +21,10 @@ import java.time.LocalDate;
 @Entity
 @Table(
         name = "pendencias_documentos",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"empresa_id", "template_documento_id", "competencia_id"})
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_pendencias_tomador_template_competencia",
+                columnNames = {"tomador_uid", "template_documento_id", "competencia_id"}
+        )
 )
 public class PendenciaDocumento {
 
@@ -26,9 +32,16 @@ public class PendenciaDocumento {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "empresa_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "empresa_id")
     private Empresa empresa;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_pessoa_fisica_id")
+    private ClientePessoaFisica clientePessoaFisica;
+
+    @Column(name = "tomador_uid", nullable = false, length = 24)
+    private String tomadorUid;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "template_documento_id", nullable = false)
@@ -45,6 +58,16 @@ public class PendenciaDocumento {
     @Column(nullable = false)
     private LocalDate vencimento;
 
+    @PrePersist
+    @PreUpdate
+    void sincronizarTomadorUid() {
+        if (empresa != null) {
+            tomadorUid = PendenciaTomadorUids.empresa(empresa.getId());
+        } else if (clientePessoaFisica != null) {
+            tomadorUid = PendenciaTomadorUids.clientePessoaFisica(clientePessoaFisica.getId());
+        }
+    }
+
     public Long getId() {
         return id;
     }
@@ -55,6 +78,22 @@ public class PendenciaDocumento {
 
     public void setEmpresa(Empresa empresa) {
         this.empresa = empresa;
+    }
+
+    public ClientePessoaFisica getClientePessoaFisica() {
+        return clientePessoaFisica;
+    }
+
+    public void setClientePessoaFisica(ClientePessoaFisica clientePessoaFisica) {
+        this.clientePessoaFisica = clientePessoaFisica;
+    }
+
+    public String getTomadorUid() {
+        return tomadorUid;
+    }
+
+    public void setTomadorUid(String tomadorUid) {
+        this.tomadorUid = tomadorUid;
     }
 
     public TemplateDocumento getTemplateDocumento() {

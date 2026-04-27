@@ -29,6 +29,7 @@ public class DocumentoInteligenciaController {
     @GetMapping("/portal/validados-por-aba")
     public DocumentosValidadosAgrupadosResponse listarValidadosPorAba(
             @RequestParam(required = false) Long empresaId,
+            @RequestParam(required = false) Long clientePessoaFisicaId,
             @RequestParam(required = false) String incluirCompetenciasArquivadas
     ) {
         Usuario usuario = AuthContext.get();
@@ -38,7 +39,8 @@ public class DocumentoInteligenciaController {
         boolean incluir = incluirCompetenciasArquivadas != null
                 && (incluirCompetenciasArquivadas.equals("1")
                 || "true".equalsIgnoreCase(incluirCompetenciasArquivadas));
-        return documentoInteligenciaService.listarDocumentosValidadosPorAba(usuario, empresaId, incluir);
+        return documentoInteligenciaService.listarDocumentosValidadosPorAba(
+                usuario, empresaId, clientePessoaFisicaId, incluir);
     }
 
     @GetMapping
