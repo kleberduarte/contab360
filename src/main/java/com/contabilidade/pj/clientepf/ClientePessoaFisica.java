@@ -1,6 +1,8 @@
 package com.contabilidade.pj.clientepf;
 
+import com.contabilidade.pj.lgpd.CpfCnpjCryptoConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,7 +23,8 @@ public class ClientePessoaFisica {
     @NotBlank
     @Size(min = 11, max = 11)
     @Pattern(regexp = "^\\d{11}$", message = "CPF deve conter 11 digitos.")
-    @Column(nullable = false, unique = true, length = 11)
+    @Convert(converter = CpfCnpjCryptoConverter.class)
+    @Column(nullable = false, unique = true, length = 100)
     private String cpf;
 
     @NotBlank
