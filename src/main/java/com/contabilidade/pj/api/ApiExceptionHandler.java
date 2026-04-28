@@ -31,6 +31,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> integridade(DataIntegrityViolationException ex) {
+        log.error("DataIntegrityViolationException: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Dados duplicados ou invalidos para persistencia."));
     }

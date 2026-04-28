@@ -113,6 +113,7 @@ public class PendenciaDocumentoService {
                     continue;
                 }
                 PendenciaDocumento pendencia = new PendenciaDocumento();
+                pendencia.setEmpresa(template.getEmpresa());
                 pendencia.setClientePessoaFisica(clientePf);
                 pendencia.setTemplateDocumento(template);
                 pendencia.setCompetencia(competencia);

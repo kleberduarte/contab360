@@ -16,7 +16,11 @@ public class WebConfig implements WebMvcConfigurer {
 
     /** Fallback quando {@code contab360.cors.origins} não está configurado. Use application-dev.properties para localhost. */
     private static final String[] DEFAULT_CORS_ORIGINS = {
-            "https://contab360.vercel.app"
+            "https://contab360.vercel.app",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173"
     };
 
     private final AuthInterceptor authInterceptor;
