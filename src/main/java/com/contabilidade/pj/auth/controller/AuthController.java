@@ -1,19 +1,22 @@
 package com.contabilidade.pj.auth.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import com.contabilidade.pj.auth.service.AuthService;
+import com.contabilidade.pj.auth.service.LoginRateLimiter;
 import com.contabilidade.pj.auth.service.UsuarioService;
 import com.contabilidade.pj.auth.entity.Usuario;
-import com.contabilidade.pj.auth.entity.SessaoAcesso;
 import com.contabilidade.pj.auth.entity.PerfilUsuario;
 import com.contabilidade.pj.auth.service.AuthContext;
 
@@ -23,15 +26,37 @@ public class AuthController {
 
     private final AuthService authService;
     private final UsuarioService usuarioService;
+    private final LoginRateLimiter rateLimiter;
 
-    public AuthController(AuthService authService, UsuarioService usuarioService) {
+    public AuthController(AuthService authService, UsuarioService usuarioService, LoginRateLimiter rateLimiter) {
         this.authService = authService;
         this.usuarioService = usuarioService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/login")
-    public AuthService.LoginResponse login(@Valid @RequestBody LoginRequest req) {
-        return authService.login(req.email(), req.senha());
+    public AuthService.LoginResponse login(@Valid @RequestBody LoginRequest req, HttpServletRequest httpRequest) {
+        String ip = obterIp(httpRequest);
+        if (rateLimiter.isoBloqueado(ip)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Muitas tentativas de login. Aguarde 15 minutos.");
+        }
+        try {
+            AuthService.LoginResponse resposta = authService.login(req.email(), req.senha());
+            rateLimiter.registrarSucesso(ip);
+            return resposta;
+        } catch (IllegalArgumentException ex) {
+            rateLimiter.registrarFalha(ip);
+            throw ex;
+        }
+    }
+
+    private String obterIp(HttpServletRequest req) {
+        String forwarded = req.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return req.getRemoteAddr();
     }
 
     @PutMapping("/senha")

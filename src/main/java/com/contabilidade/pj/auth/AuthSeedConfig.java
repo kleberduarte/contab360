@@ -30,7 +30,7 @@ public class AuthSeedConfig {
     private static final Logger log = LoggerFactory.getLogger(AuthSeedConfig.class);
     private static final String DEMO_SENHA = "123456";
 
-    @Value("${contab360.demo-reset-passwords:true}")
+    @Value("${contab360.demo-reset-passwords:false}")
     private boolean demoResetPasswords;
 
     @Bean
