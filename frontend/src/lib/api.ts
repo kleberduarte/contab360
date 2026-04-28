@@ -55,7 +55,14 @@ export async function apiFetchJson<T>(url: string, options: RequestOptions = {})
       _onUnauthorized?.();
     }
     const text = await response.text();
-    throw new Error(text || `Erro HTTP ${response.status}`);
+    let msg = text || `Erro HTTP ${response.status}`;
+    try {
+      const err = JSON.parse(text) as { message?: string };
+      if (err?.message) msg = err.message;
+    } catch {
+      // resposta não é JSON, mantém texto original
+    }
+    throw new Error(msg);
   }
 
   if (response.status === 204) {
