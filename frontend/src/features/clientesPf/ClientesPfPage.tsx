@@ -1,6 +1,7 @@
-import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
 import { Sessao } from "../../lib/session";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 type ClientePf = {
   id: number;
@@ -47,6 +48,7 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
   const [incluirInativas, setIncluirInativas] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   async function carregar() {
     setCarregando(true);
@@ -130,8 +132,14 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
     }
   }
 
-  async function desativar(id: number) {
-    if (!window.confirm("O cadastro será desativado. Deseja continuar?")) return;
+  function desativar(id: number) {
+    setConfirmId(id);
+  }
+
+  const confirmarDesativar = useCallback(async () => {
+    const id = confirmId;
+    setConfirmId(null);
+    if (id == null) return;
     setErro("");
     setOk("");
     try {
@@ -142,7 +150,7 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível desativar.");
     }
-  }
+  }, [confirmId, editandoId, sessao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function reativar(id: number) {
     setErro("");
@@ -157,6 +165,17 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
   }
 
   return (
+    <>
+      <ConfirmDialog
+        open={confirmId != null}
+        title="Desativar cadastro"
+        message="O cadastro será desativado e ficará oculto da listagem padrão. Você pode reativá-lo depois."
+        confirmLabel="Desativar"
+        cancelLabel="Cancelar"
+        danger
+        onConfirm={() => void confirmarDesativar()}
+        onCancel={() => setConfirmId(null)}
+      />
     <section className="page page--modern">
       <h2>Clientes pessoa física</h2>
       <p className="muted-react">Cadastro para IRPF e documentos sem CNPJ (guias em CPF, declarações etc.).</p>
@@ -252,5 +271,6 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
         </div>
       </div>
     </section>
+    </>
   );
 }

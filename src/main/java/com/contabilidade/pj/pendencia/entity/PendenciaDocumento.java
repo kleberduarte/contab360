@@ -62,10 +62,11 @@ public class PendenciaDocumento {
     @PrePersist
     @PreUpdate
     void sincronizarTomadorUid() {
-        if (empresa != null) {
-            tomadorUid = PendenciaTomadorUids.empresa(empresa.getId());
-        } else if (clientePessoaFisica != null) {
+        // Quando houver vínculo PF, o tomador é PF mesmo que exista empresa de contexto.
+        if (clientePessoaFisica != null) {
             tomadorUid = PendenciaTomadorUids.clientePessoaFisica(clientePessoaFisica.getId());
+        } else if (empresa != null) {
+            tomadorUid = PendenciaTomadorUids.empresa(empresa.getId());
         }
     }
 
