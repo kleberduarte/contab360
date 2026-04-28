@@ -14,13 +14,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    /** Quando {@code contab360.cors.origins} está vazio: Vite (porta ≠ 8080) envia Origin local; sem isso → 403 CORS. */
+    /** Fallback quando {@code contab360.cors.origins} não está configurado. Use application-dev.properties para localhost. */
     private static final String[] DEFAULT_CORS_ORIGINS = {
-            "https://contab360.vercel.app",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173"
+            "https://contab360.vercel.app"
     };
 
     private final AuthInterceptor authInterceptor;
