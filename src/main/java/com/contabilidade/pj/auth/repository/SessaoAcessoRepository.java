@@ -17,4 +17,5 @@ public interface SessaoAcessoRepository extends JpaRepository<SessaoAcesso, Long
             """)
     Optional<SessaoAcesso> findByTokenComUsuario(String token);
     void deleteByExpiraEmBefore(LocalDateTime dataHora);
+    void deleteByUsuario_Id(Long usuarioId);
 }

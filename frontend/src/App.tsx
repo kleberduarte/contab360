@@ -26,6 +26,8 @@ import { clearSessao, getSessao, PerfilUsuario, Sessao, setSessao } from "./lib/
 import { setOnUnauthorized } from "./lib/api";
 import { HeaderUserMenu } from "./components/HeaderUserMenu";
 import { useNavigate } from "react-router-dom";
+import { PrivacyPolicyModal } from "./features/lgpd/PrivacyPolicyModal";
+import { checkConsentimentoPendente } from "./features/lgpd/lgpdApi";
 
 function GuardContador({ sessao, children }: { sessao: Sessao; children: ReactNode }) {
   if (sessao.perfil !== "CONTADOR" && sessao.perfil !== "ADM") {
@@ -494,13 +496,25 @@ function getLinkGroupsByPerfil(perfil: PerfilUsuario): LinkGroup[] {
 
 export function App() {
   const [sessao, setSessaoState] = useState<Sessao | null>(() => getSessao());
+  const [consentimentoPendente, setConsentimentoPendente] = useState(false);
 
   useEffect(() => {
     setOnUnauthorized(() => {
       clearSessao();
       setSessaoState(null);
+      setConsentimentoPendente(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (!sessao || sessao.senhaTempAtiva) {
+      setConsentimentoPendente(false);
+      return;
+    }
+    checkConsentimentoPendente(sessao)
+      .then((r) => setConsentimentoPendente(r.pendente))
+      .catch(() => setConsentimentoPendente(false));
+  }, [sessao]);
 
   function onLogin(next: Sessao) {
     setSessao(next);
@@ -513,6 +527,7 @@ export function App() {
   function onLogout() {
     clearSessao();
     setSessaoState(null);
+    setConsentimentoPendente(false);
     window.history.replaceState(null, "", "/login");
   }
 
@@ -532,5 +547,8 @@ export function App() {
 
   if (!sessao) return <LoginPage onLogin={onLogin} />;
   if (sessao.senhaTempAtiva) return <PrimeiroAcessoPage sessao={sessao} onSenhaCriada={onSenhaCriada} />;
+  if (consentimentoPendente) {
+    return <PrivacyPolicyModal sessao={sessao} onAceito={() => setConsentimentoPendente(false)} />;
+  }
   return <AppShell sessao={sessao} onLogout={onLogout} onNomeAtualizado={onNomeAtualizado} />;
 }

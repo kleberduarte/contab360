@@ -1,6 +1,8 @@
 package com.contabilidade.pj.empresa.entity;
 
+import com.contabilidade.pj.lgpd.CpfCnpjCryptoConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,14 +23,16 @@ public class Empresa {
 
     @NotBlank
     @Size(min = 14, max = 14)
-    @Column(nullable = false, unique = true, length = 14)
+    @Convert(converter = CpfCnpjCryptoConverter.class)
+    @Column(nullable = false, unique = true, length = 100)
     private String cnpj;
 
     @NotBlank
     @Column(nullable = false)
     private String razaoSocial;
 
-    @Column(length = 11)
+    @Convert(converter = CpfCnpjCryptoConverter.class)
+    @Column(length = 100)
     @Pattern(regexp = "^\\d{11}$", message = "cpfResponsavel deve conter 11 digitos.")
     private String cpfResponsavel;
 
