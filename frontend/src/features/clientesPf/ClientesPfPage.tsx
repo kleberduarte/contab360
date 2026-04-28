@@ -245,7 +245,7 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
                     <td>
                       {c.nomeCompleto} {!a ? <span className="tag-inativa">Inativo</span> : null}
                     </td>
-                    <td title={formatarCpf(c.cpf)}>{mascararCpfLista(c.cpf)}</td>
+                    <td>{mascararCpfLista(c.cpf)}</td>
                     <td>{a ? "Ativo" : "Inativo"}</td>
                     <td className="empresas-react-table-actions">
                       {a ? (

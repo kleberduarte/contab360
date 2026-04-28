@@ -37,6 +37,7 @@ public class UsuarioService {
             throw new IllegalArgumentException("Sem permissão para listar usuários.");
         }
         return usuarioRepository.findAllComEmpresa().stream()
+                .filter(u -> usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR || u.getPerfil() == PerfilUsuario.CLIENTE)
                 .map(u -> toResponse(u, null))
                 .toList();
     }

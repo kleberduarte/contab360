@@ -83,14 +83,11 @@ public class EmpresaService {
         if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
             throw new IllegalArgumentException("Apenas contador pode desativar empresa.");
         }
-        Empresa empresa = empresaRepository
-                .findById(id)
+        Empresa empresa = empresaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
-        if (!empresa.isAtivo()) {
-            return;
+        if (empresa.isAtivo()) {
+            empresaRepository.atualizarAtivo(id, false);
         }
-        empresa.setAtivo(false);
-        empresaRepository.save(empresa);
     }
 
     @Transactional
@@ -101,10 +98,10 @@ public class EmpresaService {
         Empresa empresa = empresaRepository
                 .findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
-        if (empresa.isAtivo()) {
-            return empresa;
+        if (!empresa.isAtivo()) {
+            empresaRepository.atualizarAtivo(id, true);
+            empresa.setAtivo(true);
         }
-        empresa.setAtivo(true);
-        return empresaRepository.save(empresa);
+        return empresa;
     }
 }

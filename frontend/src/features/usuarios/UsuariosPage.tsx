@@ -36,6 +36,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [resetSenhaId, setResetSenhaId] = useState<number | null>(null);
 
+  const isContador = sessao.perfil === "CONTADOR";
   const perfisDisponiveis = sessao.perfil === "ADM" ? PERFIS_ADM : PERFIS_CONTADOR;
 
   async function carregar() {
@@ -61,11 +62,12 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   const filtrados = useMemo(() => {
     const t = buscaDef.trim().toLowerCase();
     return usuarios.filter(u => {
+      if (isContador && u.perfil !== "CLIENTE") return false;
       if (!mostrarInativos && !u.ativo) return false;
       if (!t) return true;
       return u.nome.toLowerCase().includes(t) || u.email.toLowerCase().includes(t);
     });
-  }, [usuarios, buscaDef, mostrarInativos]);
+  }, [usuarios, buscaDef, mostrarInativos, isContador]);
 
   function limparEdicao() {
     setEditandoId(null);
@@ -75,6 +77,10 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   }
 
   function iniciarEdicao(u: Usuario) {
+    if (isContador && u.perfil !== "CLIENTE") {
+      setErro("Contador só pode visualizar/editar usuários do perfil Cliente.");
+      return;
+    }
     setErro("");
     setOk("");
     setSenhaTempRevelada(null);
@@ -82,7 +88,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
     setForm({
       nome: u.nome,
       email: u.email,
-      perfil: u.perfil,
+      perfil: isContador ? "CLIENTE" : u.perfil,
       empresaId: u.empresaId != null ? String(u.empresaId) : ""
     });
   }
