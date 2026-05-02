@@ -1,10 +1,14 @@
 package com.contabilidade.pj.pendencia.controller;
 
+import com.contabilidade.pj.api.SafeContentDisposition;
 import com.contabilidade.pj.auth.service.AuthContext;
 import com.contabilidade.pj.auth.entity.Usuario;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -93,6 +97,26 @@ public class DocumentoInteligenciaController {
         return documentoInteligenciaService.listarHistorico(processamentoId, usuario).stream()
                 .map(HistoricoRevisaoResponse::fromEntity)
                 .toList();
+    }
+
+    @GetMapping("/{processamentoId}/arquivo-original")
+    public ResponseEntity<byte[]> baixarArquivoOriginal(@PathVariable Long processamentoId) {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        DocumentoInteligenciaService.ArquivoOriginalDocumento arquivo =
+                documentoInteligenciaService.obterArquivoOriginal(processamentoId, usuario);
+        MediaType contentType = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            contentType = MediaType.parseMediaType(arquivo.contentType());
+        } catch (Exception ignored) {
+            // fallback para octet-stream
+        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, SafeContentDisposition.attachment(arquivo.nomeArquivo()))
+                .contentType(contentType)
+                .body(arquivo.conteudo());
     }
 
     public record AtualizarCamposBody(List<Map<String, String>> campos) {

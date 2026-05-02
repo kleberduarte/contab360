@@ -2,8 +2,10 @@ package com.contabilidade.pj.lgpd;
 
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Base64;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,12 +18,22 @@ public class LgpdCryptoKeyHolder {
 
     private static byte[] KEY;
 
-    @Value("${lgpd.crypto.key:}")
-    private String keyBase64;
+    private final Environment environment;
+    private final String keyBase64;
+
+    public LgpdCryptoKeyHolder(Environment environment, @Value("${lgpd.crypto.key:}") String keyBase64) {
+        this.environment = environment;
+        this.keyBase64 = keyBase64;
+    }
 
     @PostConstruct
     public void init() {
+        boolean perfilProd = Arrays.asList(environment.getActiveProfiles()).contains("prod");
         if (keyBase64 == null || keyBase64.isBlank()) {
+            if (perfilProd) {
+                throw new IllegalStateException(
+                        "LGPD_CRYPTO_KEY (lgpd.crypto.key) é obrigatório com o perfil 'prod' ativo.");
+            }
             // Chave fixa apenas para desenvolvimento local — NÃO usar em produção.
             KEY = "dev-lgpd-key-contab360-32-bytes!".getBytes(StandardCharsets.UTF_8);
         } else {

@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DocTabIconCarousel } from "../../components/docCarouselIcons";
 import { apiFetchJson } from "../../lib/api";
+import { apiFetchBlob } from "../../lib/blob";
 import { Sessao } from "../../lib/session";
 import { HoleritePainelDetalhe } from "./holeritePanel";
 import { GuiaImpostoPainelDetalhe } from "./guiaImpostoPanel";
@@ -370,6 +371,12 @@ function DocValidadoCard({
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "err"; text: string } | null>(null);
   const [reprocessando, setReprocessando] = useState(false);
+  const [baixandoOriginal, setBaixandoOriginal] = useState(false);
+  const [abaVisualizacao, setAbaVisualizacao] = useState<"DOWNLOAD" | "TELA">("TELA");
+
+  useEffect(() => {
+    setAbaVisualizacao("TELA");
+  }, [doc.processamentoId]);
 
   async function reprocessar() {
     setMsg(null);
@@ -405,6 +412,27 @@ function DocValidadoCard({
       setMsg({ tipo: "err", text: e instanceof Error ? e.message : "Falha ao salvar." });
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function baixarArquivoOriginal() {
+    setMsg(null);
+    setBaixandoOriginal(true);
+    try {
+      const blob = await apiFetchBlob(`/api/inteligencia/documentos/${doc.processamentoId}/arquivo-original`, sessao);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.nomeArquivoOriginal || `documento-${doc.processamentoId}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setMsg({ tipo: "ok", text: "Download iniciado." });
+    } catch (e) {
+      setMsg({ tipo: "err", text: e instanceof Error ? e.message : "Falha ao baixar arquivo original." });
+    } finally {
+      setBaixandoOriginal(false);
     }
   }
 
@@ -452,82 +480,119 @@ function DocValidadoCard({
       </div>
 
       <DocValidadoKpis doc={doc} camposVisiveis={campos} />
-
-      {temDetalhe && doc.detalhamentoDocumento && captura === "HOLERITE_ESCRITORIO_COMPLETO" ? (
-        <div className="doc-validado-holerite-react">
-          <HoleritePainelDetalhe det={doc.detalhamentoDocumento} capturaPerfil={captura} />
-        </div>
-      ) : null}
-      {temDetalhe && doc.detalhamentoDocumento && temPainelGuia ? (
-        <div className="doc-validado-holerite-react">
-          <GuiaImpostoPainelDetalhe
-            det={doc.detalhamentoDocumento}
-            capturaPerfil={captura || "GUIA_IMPOSTO_IRPF_COMPLETO"}
-            editavel={editavel}
-            valores={valores}
-            tipoPorCampo={Object.fromEntries(campos.map((c) => [c.nome, c.tipo]))}
-            onValorChange={(nome, valor) => setValores((prev) => ({ ...prev, [nome]: valor }))}
-          />
-        </div>
-      ) : null}
-
-      <div className="doc-validado-card__body-react">
-        {camposTabela.length > 0 || camposOcultos.length > 0 ? (
-          <>
-            <div className="doc-validado-secao-head-react">
-              <h4 className="doc-validado-secao-titulo-react">{tituloSec}</h4>
-              <span className="doc-validado-secao-count-react">{camposTabela.length} campo(s)</span>
-            </div>
-            <div className="doc-validado-table-wrap-react">
-              {camposTabela.length > 0 ? (
-                <div className="doc-campos-lista-react" role="table" aria-label="Campos extraídos">
-                  <div className="doc-campos-lista-head-react" role="row">
-                    <span role="columnheader">Campo</span>
-                    <span role="columnheader">Valor</span>
-                    <span role="columnheader">Tipo</span>
-                  </div>
-                  {camposTabela.map((c) => (
-                    <div key={c.nome} className="doc-campo-item-react" role="row">
-                      <div className="doc-campo-item-react__campo" role="cell">
-                        <span className="doc-campo-item-react__label">Campo</span>
-                        <strong>{formatarLabelCampo(c.nome)}</strong>
-                      </div>
-                      <div className="doc-campo-item-react__valor" role="cell">
-                        <span className="doc-campo-item-react__label">Valor</span>
-                        {editavel ? (
-                          <input
-                            type="text"
-                            className="dados-campo-valor-doc-react"
-                            value={valores[c.nome] ?? ""}
-                            placeholder={placeholderCampo(c.tipo)}
-                            onChange={(e) => setValores((prev) => ({ ...prev, [c.nome]: e.target.value }))}
-                          />
-                        ) : (
-                          <span className="doc-campo-item-react__valor-texto">{formatarValorExibicao(c.valor, c.tipo)}</span>
-                        )}
-                      </div>
-                      <div className="doc-campo-item-react__tipo" role="cell">
-                        <span className="doc-campo-item-react__label">Tipo</span>
-                        <span className={classeChipTipoCampo(c.tipo)}>
-                          <span>{c.tipo || "TEXTO"}</span>
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : camposOcultos.length > 0 ? (
-                <p className="muted-react doc-validado-inline-hint-react">
-                  O detalhamento está no painel acima. Campos técnicos do holerite permanecem ao salvar.
-                </p>
-              ) : null}
-            </div>
-          </>
-        ) : !temDetalhe ? (
-          <p className="muted-react doc-validado-sem-campos-react">Nenhum campo extraído armazenado para este documento.</p>
-        ) : null}
+      <div className="doc-validado-card-tabs-react" role="tablist" aria-label="Visualização do documento">
+        <button
+          type="button"
+          role="tab"
+          className={`doc-validado-card-tab-react ${abaVisualizacao === "TELA" ? "is-active" : ""}`}
+          aria-selected={abaVisualizacao === "TELA"}
+          onClick={() => setAbaVisualizacao("TELA")}
+        >
+          Tela
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`doc-validado-card-tab-react ${abaVisualizacao === "DOWNLOAD" ? "is-active" : ""}`}
+          aria-selected={abaVisualizacao === "DOWNLOAD"}
+          onClick={() => setAbaVisualizacao("DOWNLOAD")}
+        >
+          Download
+        </button>
       </div>
 
-      {editavel && (camposTabela.length > 0 || camposOcultos.length > 0 || (podeReprocessar && rejeitado)) ? (
+      {abaVisualizacao === "DOWNLOAD" ? (
+        <div className="doc-validado-download-react" role="tabpanel" aria-label="Arquivo original para download">
+          <p className="doc-validado-download-react__title">Arquivo original</p>
+          <p className="doc-validado-download-react__name">{doc.nomeArquivoOriginal || "Arquivo sem nome"}</p>
+          <button
+            type="button"
+            className="ghost small-btn"
+            disabled={baixandoOriginal}
+            onClick={() => void baixarArquivoOriginal()}
+          >
+            {baixandoOriginal ? "Baixando..." : "Baixar arquivo original"}
+          </button>
+        </div>
+      ) : (
+        <>
+          {temDetalhe && doc.detalhamentoDocumento && captura === "HOLERITE_ESCRITORIO_COMPLETO" ? (
+            <div className="doc-validado-holerite-react">
+              <HoleritePainelDetalhe det={doc.detalhamentoDocumento} capturaPerfil={captura} />
+            </div>
+          ) : null}
+          {temDetalhe && doc.detalhamentoDocumento && temPainelGuia ? (
+            <div className="doc-validado-holerite-react">
+              <GuiaImpostoPainelDetalhe
+                det={doc.detalhamentoDocumento}
+                capturaPerfil={captura || "GUIA_IMPOSTO_IRPF_COMPLETO"}
+                editavel={editavel}
+                valores={valores}
+                tipoPorCampo={Object.fromEntries(campos.map((c) => [c.nome, c.tipo]))}
+                onValorChange={(nome, valor) => setValores((prev) => ({ ...prev, [nome]: valor }))}
+              />
+            </div>
+          ) : null}
+
+          <div className="doc-validado-card__body-react">
+            {camposTabela.length > 0 || camposOcultos.length > 0 ? (
+              <>
+                <div className="doc-validado-secao-head-react">
+                  <h4 className="doc-validado-secao-titulo-react">{tituloSec}</h4>
+                  <span className="doc-validado-secao-count-react">{camposTabela.length} campo(s)</span>
+                </div>
+                <div className="doc-validado-table-wrap-react">
+                  {camposTabela.length > 0 ? (
+                    <div className="doc-campos-lista-react" role="table" aria-label="Campos extraídos">
+                      <div className="doc-campos-lista-head-react" role="row">
+                        <span role="columnheader">Campo</span>
+                        <span role="columnheader">Valor</span>
+                        <span role="columnheader">Tipo</span>
+                      </div>
+                      {camposTabela.map((c) => (
+                        <div key={c.nome} className="doc-campo-item-react" role="row">
+                          <div className="doc-campo-item-react__campo" role="cell">
+                            <span className="doc-campo-item-react__label">Campo</span>
+                            <strong>{formatarLabelCampo(c.nome)}</strong>
+                          </div>
+                          <div className="doc-campo-item-react__valor" role="cell">
+                            <span className="doc-campo-item-react__label">Valor</span>
+                            {editavel ? (
+                              <input
+                                type="text"
+                                className="dados-campo-valor-doc-react"
+                                value={valores[c.nome] ?? ""}
+                                placeholder={placeholderCampo(c.tipo)}
+                                onChange={(e) => setValores((prev) => ({ ...prev, [c.nome]: e.target.value }))}
+                              />
+                            ) : (
+                              <span className="doc-campo-item-react__valor-texto">{formatarValorExibicao(c.valor, c.tipo)}</span>
+                            )}
+                          </div>
+                          <div className="doc-campo-item-react__tipo" role="cell">
+                            <span className="doc-campo-item-react__label">Tipo</span>
+                            <span className={classeChipTipoCampo(c.tipo)}>
+                              <span>{c.tipo || "TEXTO"}</span>
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : camposOcultos.length > 0 ? (
+                    <p className="muted-react doc-validado-inline-hint-react">
+                      O detalhamento está no painel acima. Campos técnicos do holerite permanecem ao salvar.
+                    </p>
+                  ) : null}
+                </div>
+              </>
+            ) : !temDetalhe ? (
+              <p className="muted-react doc-validado-sem-campos-react">Nenhum campo extraído armazenado para este documento.</p>
+            ) : null}
+          </div>
+        </>
+      )}
+
+      {abaVisualizacao === "TELA" && editavel && (camposTabela.length > 0 || camposOcultos.length > 0 || (podeReprocessar && rejeitado)) ? (
         <form className="doc-validado-card__actions-react" onSubmit={salvar}>
           {camposTabela.length > 0 || camposOcultos.length > 0 ? (
             <p className="doc-validado-card__actions-tip-react muted-react">

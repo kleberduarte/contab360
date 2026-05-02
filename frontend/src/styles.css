@@ -3950,6 +3950,63 @@ button.small:hover:not(:disabled) {
   color: #0f172a;
 }
 
+.doc-validado-card-tabs-react {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.45rem 0 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.doc-validado-card-tab-react {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.32rem 0.72rem;
+  cursor: pointer;
+}
+
+.doc-validado-card-tab-react:hover {
+  color: var(--text);
+}
+
+.doc-validado-card-tab-react.is-active {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.doc-validado-download-react {
+  margin-top: 0.55rem;
+  border: 1px dashed rgba(148, 163, 184, 0.55);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.doc-validado-download-react__title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.doc-validado-download-react__name {
+  margin: 0.28rem 0 0.65rem;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-word;
+}
+
 .dados-tabela-react {
   width: 100%;
   border-collapse: separate;

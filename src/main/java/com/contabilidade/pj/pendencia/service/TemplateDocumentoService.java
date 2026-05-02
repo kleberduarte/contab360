@@ -6,6 +6,7 @@ import com.contabilidade.pj.clientepf.ClientePessoaFisica;
 import com.contabilidade.pj.clientepf.ClientePessoaFisicaRepository;
 import com.contabilidade.pj.empresa.entity.Empresa;
 import com.contabilidade.pj.empresa.repository.EmpresaRepository;
+import com.contabilidade.pj.ia.service.AuditoriaService;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -21,20 +22,35 @@ public class TemplateDocumentoService {
     private final EmpresaRepository empresaRepository;
     private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
+    private final DocumentoDadoExtraidoRepository documentoDadoExtraidoRepository;
+    private final RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository;
+    private final DocumentoProcessamentoRepository documentoProcessamentoRepository;
+    private final EntregaDocumentoRepository entregaDocumentoRepository;
     private final DocTabMapperService docTabMapperService;
+    private final AuditoriaService auditoriaService;
 
     public TemplateDocumentoService(
             TemplateDocumentoRepository templateDocumentoRepository,
             EmpresaRepository empresaRepository,
             ClientePessoaFisicaRepository clientePessoaFisicaRepository,
             PendenciaDocumentoRepository pendenciaDocumentoRepository,
-            DocTabMapperService docTabMapperService
+            DocumentoDadoExtraidoRepository documentoDadoExtraidoRepository,
+            RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository,
+            DocumentoProcessamentoRepository documentoProcessamentoRepository,
+            EntregaDocumentoRepository entregaDocumentoRepository,
+            DocTabMapperService docTabMapperService,
+            AuditoriaService auditoriaService
     ) {
         this.templateDocumentoRepository = templateDocumentoRepository;
         this.empresaRepository = empresaRepository;
         this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
         this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
+        this.documentoDadoExtraidoRepository = documentoDadoExtraidoRepository;
+        this.revisaoDocumentoHistoricoRepository = revisaoDocumentoHistoricoRepository;
+        this.documentoProcessamentoRepository = documentoProcessamentoRepository;
+        this.entregaDocumentoRepository = entregaDocumentoRepository;
         this.docTabMapperService = docTabMapperService;
+        this.auditoriaService = auditoriaService;
     }
 
     @Transactional(readOnly = true)
@@ -163,16 +179,46 @@ public class TemplateDocumentoService {
 
     @Transactional
     public void remover(Long id, Usuario usuarioAtual) {
-        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
-            throw new IllegalArgumentException("Apenas contador pode excluir template.");
+        boolean isContador = usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR;
+        boolean isAdm = usuarioAtual.getPerfil() == PerfilUsuario.ADM;
+        if (!isContador && !isAdm) {
+            throw new IllegalArgumentException("Apenas contador ou ADM pode excluir template.");
         }
         TemplateDocumento template = templateDocumentoRepository
                 .findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Template não encontrado."));
-        if (pendenciaDocumentoRepository.countByTemplateDocumento_Id(id) > 0) {
+        long totalPendencias = pendenciaDocumentoRepository.countByTemplateDocumento_Id(id);
+        if (isContador && totalPendencias > 0) {
             throw new IllegalArgumentException("Não é possível excluir: existem pendências vinculadas a este template.");
         }
+        if (isAdm && totalPendencias > 0) {
+            removerPendenciasECadeiaPorTemplate(id);
+        }
         templateDocumentoRepository.delete(template);
+        if (isAdm) {
+            auditoriaService.registrarEventoAdm(
+                    "DELETE",
+                    "/api/templates-documentos/" + id + "?modo=forcado-adm&pendenciasRemovidas=" + totalPendencias,
+                    usuarioAtual,
+                    204
+            );
+        }
+    }
+
+    /**
+     * Remove pendências do template e toda a cadeia (dados extraídos, histórico de revisão,
+     * processamento, entregas) para satisfazer FKs antes de excluir o template.
+     */
+    private void removerPendenciasECadeiaPorTemplate(Long templateId) {
+        List<Long> pendenciaIds = pendenciaDocumentoRepository.findIdsByTemplateDocumento_Id(templateId);
+        if (pendenciaIds.isEmpty()) {
+            return;
+        }
+        documentoDadoExtraidoRepository.deleteByProcessamento_Entrega_Pendencia_IdIn(pendenciaIds);
+        revisaoDocumentoHistoricoRepository.deleteByProcessamento_Entrega_Pendencia_IdIn(pendenciaIds);
+        documentoProcessamentoRepository.deleteByEntrega_Pendencia_IdIn(pendenciaIds);
+        entregaDocumentoRepository.deleteByPendencia_IdIn(pendenciaIds);
+        pendenciaDocumentoRepository.deleteByTemplateDocumento_Id(templateId);
     }
 
     private IllegalArgumentException traduzirErroPersistencia(DataIntegrityViolationException ex) {

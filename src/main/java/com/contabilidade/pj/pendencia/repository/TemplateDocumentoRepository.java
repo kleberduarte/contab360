@@ -21,4 +21,6 @@ public interface TemplateDocumentoRepository extends JpaRepository<TemplateDocum
     boolean existsByEmpresaIdAndNomeIgnoreCaseAndIdNot(Long empresaId, String nome, Long id);
 
     boolean existsByClientePessoaFisicaIdAndNomeIgnoreCaseAndIdNot(Long clientePessoaFisicaId, String nome, Long id);
+
+    void deleteByEmpresa_Id(Long empresaId);
 }

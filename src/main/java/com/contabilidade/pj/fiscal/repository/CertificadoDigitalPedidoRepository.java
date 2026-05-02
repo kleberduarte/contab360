@@ -10,4 +10,6 @@ public interface CertificadoDigitalPedidoRepository extends JpaRepository<Certif
 
     @Query("SELECT DISTINCT c FROM CertificadoDigitalPedido c LEFT JOIN FETCH c.empresa ORDER BY c.criadoEm DESC")
     List<CertificadoDigitalPedido> findAllWithEmpresaOrderByCriadoEmDesc();
+
+    void deleteByEmpresa_Id(Long empresaId);
 }

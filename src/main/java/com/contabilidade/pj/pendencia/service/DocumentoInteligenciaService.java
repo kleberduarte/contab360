@@ -698,6 +698,35 @@ public class DocumentoInteligenciaService {
         return obterDadosExtraidosPorPendencia(pendenciaId, usuarioAtual);
     }
 
+    @Transactional(readOnly = true)
+    public ArquivoOriginalDocumento obterArquivoOriginal(Long processamentoId, Usuario usuarioAtual) {
+        DocumentoProcessamento processamento = documentoProcessamentoRepository.findById(processamentoId)
+                .orElseThrow(() -> new IllegalArgumentException("Documento de processamento nao encontrado."));
+        PendenciaDocumento pend = processamento.getEntrega().getPendencia();
+        if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
+            if (!PendenciaClienteDono.clienteEhDonoDaPendencia(usuarioAtual, pend)) {
+                throw new IllegalArgumentException("Cliente sem permissão para baixar este documento.");
+            }
+        } else if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
+            throw new IllegalArgumentException("Perfil não autorizado a baixar arquivo.");
+        }
+        String nomeArquivo = processamento.getEntrega().getNomeArquivoOriginal();
+        String caminhoArquivo = processamento.getEntrega().getCaminhoArquivo();
+        try {
+            Path path = Path.of(caminhoArquivo);
+            byte[] conteudo = Files.readAllBytes(path);
+            String contentType = Files.probeContentType(path);
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+            return new ArquivoOriginalDocumento(nomeArquivo, contentType, conteudo);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Falha ao ler arquivo original.", ex);
+        }
+    }
+
+    public record ArquivoOriginalDocumento(String nomeArquivo, String contentType, byte[] conteudo) {}
+
     private static String montarResumoAlteracaoCampos(Map<String, String> anterior, Map<String, String> novo) {
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, String> e : novo.entrySet()) {

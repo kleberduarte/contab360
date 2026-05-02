@@ -45,7 +45,15 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
   const [resetSenhaId, setResetSenhaId] = useState<number | null>(null);
 
   const isContador = sessao.perfil === "CONTADOR";
-  const perfisDisponiveis = sessao.perfil === "ADM" ? PERFIS_ADM : PERFIS_CONTADOR;
+  const isAdm = sessao.perfil === "ADM";
+  const perfisDisponiveis = isAdm ? PERFIS_ADM : PERFIS_CONTADOR;
+
+  function isProprioUsuario(u: Usuario): boolean {
+    if (sessao.usuarioId != null && Number.isFinite(sessao.usuarioId)) {
+      return u.id === sessao.usuarioId;
+    }
+    return u.email.trim().toLowerCase() === sessao.usuarioEmail.trim().toLowerCase();
+  }
 
   async function carregar() {
     setCarregando(true);
@@ -158,12 +166,12 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
     try {
       await apiFetchJson(`/api/usuarios/${id}`, { method: "DELETE", sessao });
       if (editandoId === id) limparEdicao();
-      setOk("Usuário desativado.");
+      setOk(isAdm ? "Usuário excluído do sistema." : "Usuário desativado.");
       await carregar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível desativar.");
     }
-  }, [confirmId, editandoId, sessao]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirmId, editandoId, sessao, isAdm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function reativar(id: number) {
     setErro("");
@@ -191,7 +199,11 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
     <ConfirmDialog
       open={confirmId != null}
       title="Desativar usuário"
-      message="O usuário será desativado e não poderá mais acessar o sistema. Você pode reativá-lo depois."
+      message={
+        isAdm
+          ? "Como administrador, esta ação remove o usuário do cadastro (exclusão permanente). Sessões e vínculos de acesso a este login serão encerrados. Não é possível reativar."
+          : "O usuário será desativado e não poderá mais acessar o sistema. Você pode reativá-lo depois."
+      }
       confirmLabel="Desativar"
       cancelLabel="Cancelar"
       danger
@@ -297,7 +309,7 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
                       {u.ativo ? (
                         <>
                           <button type="button" className="small" onClick={() => iniciarEdicao(u)}>Editar</button>
-                          {u.id !== Number(sessao.usuarioEmail) ? (
+                          {!isProprioUsuario(u) ? (
                             <button type="button" className="small danger" onClick={() => desativar(u.id)}>Desativar</button>
                           ) : null}
                         </>

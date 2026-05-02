@@ -9,4 +9,6 @@ public interface ConsentimentoTitularRepository extends JpaRepository<Consentime
             Long usuarioId, String versaoPolitica);
 
     boolean existsByUsuario_IdAndVersaoPolitica(Long usuarioId, String versaoPolitica);
+
+    void deleteByUsuario_Id(Long usuarioId);
 }

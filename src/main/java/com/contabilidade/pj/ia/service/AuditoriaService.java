@@ -39,6 +39,27 @@ public class AuditoriaService {
         auditoriaEventoRepository.save(ev);
     }
 
+    @Transactional
+    public void registrarEventoAdm(String metodo, String path, Usuario usuario, int statusHttp) {
+        if (path == null || path.isBlank()) {
+            return;
+        }
+        AuditoriaEvento ev = new AuditoriaEvento();
+        ev.setMetodoHttp(metodo == null ? "?" : metodo);
+        ev.setPath(truncar(path, 500));
+        ev.setCategoria(categorizar(path));
+        ev.setStatusHttp(statusHttp);
+        ev.setCriadoEm(Instant.now());
+        if (usuario != null) {
+            ev.setUsuarioEmail(truncar(usuario.getEmail(), 118));
+            ev.setPerfil(usuario.getPerfil() != null ? usuario.getPerfil().name() : null);
+        } else {
+            ev.setUsuarioEmail(null);
+            ev.setPerfil(null);
+        }
+        auditoriaEventoRepository.save(ev);
+    }
+
     private static String categorizar(String path) {
         if (path.startsWith("/api/fiscal")) {
             return "FISCAL";

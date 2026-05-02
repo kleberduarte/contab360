@@ -10,6 +10,8 @@ import com.contabilidade.pj.pendencia.entity.DocumentoProcessamento;
 import com.contabilidade.pj.pendencia.entity.ProcessamentoStatus;
 
 public interface DocumentoProcessamentoRepository extends JpaRepository<DocumentoProcessamento, Long> {
+    void deleteByEntrega_Pendencia_IdIn(Collection<Long> pendenciaIds);
+
     Optional<DocumentoProcessamento> findByEntregaId(Long entregaId);
     Optional<DocumentoProcessamento> findTopByEntregaPendenciaIdOrderByAtualizadoEmDesc(Long pendenciaId);
     @Query("""

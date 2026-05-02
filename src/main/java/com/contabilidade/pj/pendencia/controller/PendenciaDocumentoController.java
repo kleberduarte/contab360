@@ -1,5 +1,6 @@
 package com.contabilidade.pj.pendencia.controller;
 
+import com.contabilidade.pj.api.SafeContentDisposition;
 import com.contabilidade.pj.auth.service.AuthContext;
 import com.contabilidade.pj.auth.entity.Usuario;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -97,7 +98,7 @@ public class PendenciaDocumentoController {
                 ? MediaType.APPLICATION_PDF
                 : new MediaType("text", "csv", StandardCharsets.UTF_8);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, SafeContentDisposition.attachment(nomeArquivo))
                 .contentType(tipo)
                 .body(body);
     }
