@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.contabilidade.pj.pendencia.entity.*;
 import com.contabilidade.pj.pendencia.repository.*;
+import com.contabilidade.pj.push.PushNotificationService;
 
 @Service
 public class PendenciaDocumentoService {
@@ -27,6 +28,7 @@ public class PendenciaDocumentoService {
     private final EmpresaRepository empresaRepository;
     private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final CompetenciaArquivamentoService competenciaArquivamentoService;
+    private final PushNotificationService pushNotificationService;
 
     public PendenciaDocumentoService(
             CompetenciaMensalRepository competenciaMensalRepository,
@@ -34,7 +36,8 @@ public class PendenciaDocumentoService {
             TemplateDocumentoRepository templateDocumentoRepository,
             EmpresaRepository empresaRepository,
             ClientePessoaFisicaRepository clientePessoaFisicaRepository,
-            CompetenciaArquivamentoService competenciaArquivamentoService
+            CompetenciaArquivamentoService competenciaArquivamentoService,
+            PushNotificationService pushNotificationService
     ) {
         this.competenciaMensalRepository = competenciaMensalRepository;
         this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
@@ -42,6 +45,7 @@ public class PendenciaDocumentoService {
         this.empresaRepository = empresaRepository;
         this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
         this.competenciaArquivamentoService = competenciaArquivamentoService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     /**
@@ -115,6 +119,7 @@ public class PendenciaDocumentoService {
 
         if (totalCriadas > 0) {
             competenciaArquivamentoService.sincronizarArquivamentoCompetencia(competencia.getId());
+            pushNotificationService.notificarPendenciasGeradas(empresaId, clientePessoaFisicaId, totalCriadas);
         }
         return totalCriadas;
     }

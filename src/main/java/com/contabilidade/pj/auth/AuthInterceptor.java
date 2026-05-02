@@ -33,7 +33,8 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (!path.startsWith("/api/")
                 || path.equals("/api/health")
                 || path.equals("/api/features")
-                || path.equals("/api/auth/login")) {
+                || path.equals("/api/auth/login")
+                || (path.equals("/api/push/vapid-public-key") && "GET".equalsIgnoreCase(request.getMethod()))) {
             return true;
         }
 
