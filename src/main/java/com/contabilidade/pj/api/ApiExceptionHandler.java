@@ -31,9 +31,24 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> integridade(DataIntegrityViolationException ex) {
-        log.error("DataIntegrityViolationException: {}", ex.getMostSpecificCause().getMessage());
+        String cause = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        log.error("DataIntegrityViolationException: {}", cause);
+        String msg = "Não foi possível salvar os dados. Verifique os valores informados.";
+        if (cause != null) {
+            String c = cause.toLowerCase();
+            if (c.contains("templates_documentos")
+                    && (c.contains("duplicate entry") || c.contains("unique"))) {
+                msg = "Ja existe um template com esse nome para este tomador (empresa ou pessoa fisica).";
+            } else if (c.contains("duplicate entry") || c.contains("unique constraint")) {
+                msg = "Registro duplicado: já existe um cadastro com esse valor único (por exemplo, CNPJ ou CPF já utilizado).";
+            } else if (c.contains("foreign key constraint") || c.contains("cannot add or update")) {
+                msg = "Não foi possível salvar: referência inválida ou registro relacionado inexistente.";
+            } else if (c.contains("data too long") || c.contains("data truncation")) {
+                msg = "Um ou mais campos excedem o tamanho permitido.";
+            }
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Dados duplicados ou invalidos para persistencia."));
+                .body(Map.of("message", msg));
     }
 
     @ExceptionHandler(Exception.class)

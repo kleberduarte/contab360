@@ -30,7 +30,8 @@ public record DocumentosValidadosAgrupadosResponse(
             Double confianca,
             List<DadosExtraidosPendenciaDto.CampoExtraido> campos,
             Map<String, Object> detalhamentoDocumento,
-            String capturaPerfil
+            String capturaPerfil,
+            String status
     ) {
     }
 }

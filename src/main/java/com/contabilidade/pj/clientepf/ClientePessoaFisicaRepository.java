@@ -8,6 +8,8 @@ public interface ClientePessoaFisicaRepository extends JpaRepository<ClientePess
 
     Optional<ClientePessoaFisica> findByCpf(String cpf);
 
+    Optional<ClientePessoaFisica> findFirstByNomeCompletoIgnoreCase(String nomeCompleto);
+
     boolean existsByCpfAndIdNot(String cpf, Long id);
 
     List<ClientePessoaFisica> findAllByAtivoTrueOrderByNomeCompletoAsc();

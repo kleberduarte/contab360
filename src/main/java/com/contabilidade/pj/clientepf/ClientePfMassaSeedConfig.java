@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
@@ -42,6 +43,7 @@ public class ClientePfMassaSeedConfig {
     private static final String SENHA_MASSA = "123456";
 
     @Bean
+    @ConditionalOnProperty(name = "contab360.auth.seed.enabled", havingValue = "true")
     CommandLineRunner seedClientePfMassa(
             ClientePessoaFisicaRepository clientePessoaFisicaRepository,
             UsuarioRepository usuarioRepository,
@@ -73,7 +75,25 @@ public class ClientePfMassaSeedConfig {
                     });
 
             // 2. Usuário CLIENTE vinculado ao PF
-            usuarioRepository.findByEmail(EMAIL_MASSA).orElseGet(() -> {
+            usuarioRepository.findByEmail(EMAIL_MASSA).ifPresentOrElse(u -> {
+                boolean mudou = false;
+                if (u.getPerfil() != PerfilUsuario.CLIENTE) {
+                    u.setPerfil(PerfilUsuario.CLIENTE);
+                    mudou = true;
+                }
+                if (u.getClientePessoaFisica() == null || !pf.getId().equals(u.getClientePessoaFisica().getId())) {
+                    u.setClientePessoaFisica(pf);
+                    mudou = true;
+                }
+                if (u.getEmpresa() == null && empresaBase != null) {
+                    u.setEmpresa(empresaBase);
+                    mudou = true;
+                }
+                if (mudou) {
+                    usuarioRepository.save(u);
+                    log.info("Usuário PF demo atualizado com vínculo PF: {}", EMAIL_MASSA);
+                }
+            }, () -> {
                 Usuario u = new Usuario();
                 u.setNome(NOME_MASSA);
                 u.setEmail(EMAIL_MASSA);
@@ -84,7 +104,6 @@ public class ClientePfMassaSeedConfig {
                 u.setAtivo(true);
                 usuarioRepository.save(u);
                 log.info("Usuário PF demo criado: {}", EMAIL_MASSA);
-                return u;
             });
 
             if (empresaBase == null) {

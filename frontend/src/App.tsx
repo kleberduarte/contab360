@@ -28,6 +28,7 @@ import { HeaderUserMenu } from "./components/HeaderUserMenu";
 import { useNavigate } from "react-router-dom";
 import { PrivacyPolicyModal } from "./features/lgpd/PrivacyPolicyModal";
 import { checkConsentimentoPendente } from "./features/lgpd/lgpdApi";
+import { applyDocTabsTone, getDocTabsTone } from "./lib/docTabsTone";
 
 function GuardContador({ sessao, children }: { sessao: Sessao; children: ReactNode }) {
   if (sessao.perfil !== "CONTADOR" && sessao.perfil !== "ADM") {
@@ -497,6 +498,10 @@ function getLinkGroupsByPerfil(perfil: PerfilUsuario): LinkGroup[] {
 export function App() {
   const [sessao, setSessaoState] = useState<Sessao | null>(() => getSessao());
   const [consentimentoPendente, setConsentimentoPendente] = useState(false);
+
+  useEffect(() => {
+    applyDocTabsTone(getDocTabsTone());
+  }, []);
 
   useEffect(() => {
     setOnUnauthorized(() => {

@@ -1,0 +1,44 @@
+﻿# === Metadados massa Contab360 (gerado por scripts/generate_doc_test_mass.ps1) ===
+# escopo_pendencia (massa): PJ
+#   PJ -> nome empresarial de referencia: ACME SERVICOS CONTABEIS LTDA
+#   PF -> nome da pessoa fisica de referencia: Maria Fernanda Costa Oliveira | CPF 529.982.247-25 (52998224725)
+# Ajuste as pendencias para competencia 2026-04 e CNPJ da empresa = 12.345.678/0001-95 (12345678000195) quando aplicavel.
+# tipo_documento_detectado_esperado: NFCE
+# aba_carrossel_esperada: NFCE
+# fonte_leitura: texto
+#
+# Estrutura JSON gravada em dadosExtraidosJson (resumo):
+#   fonte, tipoDocumento, status, confianca, camposObrigatorios[], camposExtraidos{}, motivosRevisao[]
+#   + detalhamentoDocumento? + capturaPerfil? (holerite / guia IRPF completos)
+#
+# Chaves tipicas em camposExtraidos para este cenario:
+#   - cnpj
+#   - cnpjPrestador
+#   - cnpjTomador
+#   - valor
+#   - competencia
+#   - vencimento
+#   - tributo
+#   - tipoDocumento
+#   - valorServicos
+#   - valorIss
+#   - pis
+#   - cofins
+#   - valorLiquido
+#
+# Notas: Inclui quadro ISS opcional (mesmos campos da NFS-e em texto).
+# === Fim metadados / inicio do texto simulado ===
+
+NFC-e Nota Fiscal do Consumidor Eletronica
+Emitente  -  Razao Social: ACME SERVICOS CONTABEIS LTDA
+CNPJ: 12.345.678/0001-95
+Inscricao Estadual: 123.456.789.110
+Endereco: Av. Exemplo, 1000  -  Sao Paulo/SP
+Competencia de referencia: 04/2026
+Valor total da nota = R$ 85,40
+Valor dos Servicos: R$ 85,40
+Aliquota ISS: 5,00%
+Valor ISS: R$ 4,27
+PIS: R$ 0,55
+COFINS: R$ 2,56
+Valor Liquido: R$ 78,02

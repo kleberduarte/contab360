@@ -1,0 +1,36 @@
+﻿# === Metadados massa Contab360 (gerado por scripts/generate_doc_test_mass.ps1) ===
+# escopo_pendencia (massa): PJ
+#   PJ -> nome empresarial de referencia: ACME SERVICOS CONTABEIS LTDA
+#   PF -> nome da pessoa fisica de referencia: Maria Fernanda Costa Oliveira | CPF 529.982.247-25 (52998224725)
+# Ajuste as pendencias para competencia 2026-04 e CNPJ da empresa = 12.345.678/0001-95 (12345678000195) quando aplicavel.
+# tipo_documento_detectado_esperado: GUIA_IMPOSTO
+# aba_carrossel_esperada: GUIA_IMPOSTO
+# fonte_leitura: texto
+#
+# Estrutura JSON gravada em dadosExtraidosJson (resumo):
+#   fonte, tipoDocumento, status, confianca, camposObrigatorios[], camposExtraidos{}, motivosRevisao[]
+#   + detalhamentoDocumento? + capturaPerfil? (holerite / guia IRPF completos)
+#
+# Chaves tipicas em camposExtraidos para este cenario:
+#   - cnpj
+#   - cnpjPrestador
+#   - cnpjTomador
+#   - valor
+#   - competencia
+#   - vencimento
+#   - tributo
+#   - tipoDocumento
+#   - detalhamentoDocumento? (IRPF)
+#   - capturaPerfil? GUIA_IMPOSTO_IRPF_COMPLETO
+#
+# Notas: tributo inferido por palavras-chave (ex.: IRPJ, DARF). Alinhar vencimento da pendencia com 2026-05-10 se quiser evitar motivo de revisao.
+# === Fim metadados / inicio do texto simulado ===
+
+DARF  -  Documento de Arrecadacao de Receitas Federais
+Codigo de receita: 2089  -  IRPJ  -  PJ
+Nome empresarial / contribuinte: ACME SERVICOS CONTABEIS LTDA
+CNPJ: 12.345.678/0001-95
+Periodo de apuracao: 04/2026
+Valor principal: R$ 2.150,00
+Vencimento: 10/05/2026
+Autenticacao bancaria (simulada): A1B2-C3D4-E5F6

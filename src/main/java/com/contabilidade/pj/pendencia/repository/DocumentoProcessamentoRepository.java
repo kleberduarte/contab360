@@ -1,5 +1,6 @@
 package com.contabilidade.pj.pendencia.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,7 +15,9 @@ public interface DocumentoProcessamentoRepository extends JpaRepository<Document
     @Query("""
             select
                 dp.entrega.pendencia.id as pendenciaId,
-                dp.observacaoProcessamento as observacaoProcessamento
+                dp.observacaoProcessamento as observacaoProcessamento,
+                dp.status as status,
+                dp.dadosExtraidosJson as dadosExtraidosJson
             from DocumentoProcessamento dp
             where dp.entrega.pendencia.id in :pendenciaIds
               and dp.atualizadoEm = (
@@ -93,8 +96,72 @@ public interface DocumentoProcessamentoRepository extends JpaRepository<Document
             @Param("status") ProcessamentoStatus status
     );
 
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.empresa.id = :empresaId
+              and dp.status in :statuses
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByEmpresaIdAndStatusIn(
+            @Param("empresaId") Long empresaId,
+            @Param("statuses") Collection<ProcessamentoStatus> statuses
+    );
+
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.empresa.id = :empresaId
+              and dp.status in :statuses
+              and c.arquivada = false
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByEmpresaIdAndStatusInExcluindoCompetenciaArquivada(
+            @Param("empresaId") Long empresaId,
+            @Param("statuses") Collection<ProcessamentoStatus> statuses
+    );
+
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.clientePessoaFisica.id = :clientePfId
+              and dp.status in :statuses
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByClientePessoaFisicaIdAndStatusIn(
+            @Param("clientePfId") Long clientePfId,
+            @Param("statuses") Collection<ProcessamentoStatus> statuses
+    );
+
+    @Query("""
+            select dp from DocumentoProcessamento dp
+            join fetch dp.entrega e
+            join fetch e.pendencia p
+            join fetch p.competencia c
+            join fetch p.templateDocumento
+            where p.clientePessoaFisica.id = :clientePfId
+              and dp.status in :statuses
+              and c.arquivada = false
+            order by dp.atualizadoEm desc
+            """)
+    List<DocumentoProcessamento> findByClientePessoaFisicaIdAndStatusInExcluindoCompetenciaArquivada(
+            @Param("clientePfId") Long clientePfId,
+            @Param("statuses") Collection<ProcessamentoStatus> statuses
+    );
+
     interface ObservacaoPendenciaView {
         Long getPendenciaId();
         String getObservacaoProcessamento();
+        ProcessamentoStatus getStatus();
+        String getDadosExtraidosJson();
     }
 }

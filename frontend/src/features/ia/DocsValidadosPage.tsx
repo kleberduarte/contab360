@@ -3,6 +3,7 @@ import { DocTabIconCarousel } from "../../components/docCarouselIcons";
 import { apiFetchJson } from "../../lib/api";
 import { Sessao } from "../../lib/session";
 import { HoleritePainelDetalhe } from "./holeritePanel";
+import { GuiaImpostoPainelDetalhe } from "./guiaImpostoPanel";
 
 type CampoExtraido = { nome: string; valor: string | null; tipo: string | null };
 
@@ -17,6 +18,7 @@ type DocumentoValidadoItem = {
   campos: CampoExtraido[];
   detalhamentoDocumento: Record<string, unknown> | null;
   capturaPerfil: string | null;
+  status: string | null;
 };
 
 type AbaDocumentos = {
@@ -72,6 +74,71 @@ function classeChipTipoCampo(tipo: string | null | undefined): string {
   return "doc-tipo-chip-react doc-tipo-chip--texto";
 }
 
+function formatarMoedaBr(valor: string): string {
+  const num = parseFloat(valor.replace(",", "."));
+  if (isNaN(num)) return valor;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatarValorExibicao(valor: string | null | undefined, tipo: string | null | undefined): string {
+  if (!valor) return "";
+  const t = (tipo || "TEXTO").trim().toUpperCase();
+  if (t === "MOEDA" || t === "VALOR") return formatarMoedaBr(valor);
+  return valor;
+}
+
+function normalizarChaveCampo(chave: string): string {
+  return (chave || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function parseCompetenciaTexto(valor: string): { ano: number; mes: number } | null {
+  const v = (valor || "").trim();
+  if (!v) return null;
+  const yyyyMm = v.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (yyyyMm) {
+    const ano = Number(yyyyMm[1]);
+    const mes = Number(yyyyMm[2]);
+    if (mes >= 1 && mes <= 12) return { ano, mes };
+  }
+  const mmYyyy = v.match(/^(\d{1,2})[-/](\d{4})$/);
+  if (mmYyyy) {
+    const mes = Number(mmYyyy[1]);
+    const ano = Number(mmYyyy[2]);
+    if (mes >= 1 && mes <= 12) return { ano, mes };
+  }
+  return null;
+}
+
+function parseDataIsoOuBr(valor: string): { ano: number; mes: number; dia: number } | null {
+  const v = (valor || "").trim();
+  if (!v) return null;
+  const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return { ano: Number(iso[1]), mes: Number(iso[2]), dia: Number(iso[3]) };
+  const br = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) return { ano: Number(br[3]), mes: Number(br[2]), dia: Number(br[1]) };
+  return null;
+}
+
+function competenciaDeData(valorData: string): string {
+  const d = parseDataIsoOuBr(valorData);
+  if (!d) return "";
+  return `${d.ano}-${String(d.mes).padStart(2, "0")}`;
+}
+
+function vencimentoDeCompetencia(valorCompetencia: string): string {
+  const comp = parseCompetenciaTexto(valorCompetencia);
+  if (!comp) return "";
+  const data = new Date(comp.ano, comp.mes, 10);
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${dia}/${mes}/${ano}`;
+}
+
 function placeholderCampo(tipo: string | null | undefined): string {
   const base = (tipo || "TEXTO").trim().toUpperCase();
   if (base === "CNPJ") return "Ex.: 12345678000195";
@@ -82,28 +149,92 @@ function placeholderCampo(tipo: string | null | undefined): string {
   return "Preencha o valor do campo";
 }
 
+function nomesCamposGuiaDoDetalhe(det: Record<string, unknown> | null | undefined): Set<string> {
+  const nomes = new Set<string>();
+  if (!det || typeof det !== "object") return nomes;
+  const secoes = (det as { secoes?: unknown }).secoes;
+  if (!Array.isArray(secoes)) return nomes;
+  for (const secao of secoes) {
+    const campos = (secao as { campos?: unknown })?.campos;
+    if (!Array.isArray(campos)) continue;
+    for (const campo of campos) {
+      const nome = String((campo as { nome?: unknown })?.nome || "").trim();
+      if (nome) nomes.add(nome);
+    }
+  }
+  return nomes;
+}
+
 function idAbaFromPayload(a: AbaDocumentos): string {
   if (a.idAba) return String(a.idAba);
   const t = (a.titulo || "").toLowerCase();
   if (t.includes("nota")) return "NOTA_FISCAL";
   if (t.includes("holerite") || t.includes("folha")) return "FOLHA_PAGAMENTO";
+  if (t.includes("irpf")) return "GUIA_IRPF";
+  if (t.includes("irpj")) return "GUIA_IRPJ";
+  if (t.includes("csll")) return "GUIA_CSLL";
+  if (t.includes("pis") && t.includes("pasep")) return "GUIA_PIS";
+  if (t.includes("cofins")) return "GUIA_COFINS";
+  if (t.includes("ipi")) return "GUIA_IPI";
+  if (t.includes("iof")) return "GUIA_IOF";
+  if (t.includes("irrf")) return "GUIA_IRRF";
+  if (/\bcide\b/i.test(t)) return "GUIA_CIDE";
+  if (t.includes("importação") || t.includes("importacao")) return "GUIA_II";
+  if (t.includes("itr") || t.includes("territorial rural")) return "GUIA_ITR";
+  if (t.includes("funrural")) return "GUIA_FUNRURAL";
+  if (t.includes("guia")) return "GUIA_IRPF";
+  if (t.includes("declar") || t.includes("obriga")) return "DECLARACAO_OBRIGACAO";
+  if (t.includes("sped") || t.includes("efd")) return "SPED_FISCAL_CONTRIBUICOES";
+  if (t.includes("ecd") || t.includes("ecf")) return "SPED_CONTABIL_FISCAL";
+  if (t.includes("balancete") || t.includes("demonstra")) return "BALANCETES_DEMONSTRACOES";
   if (t.includes("extrato")) return "EXTRATO_BANCARIO";
-  if (t.includes("recibo")) return "RECIBO_DESPESA";
-  if (t.includes("guia")) return "GUIA_IMPOSTO";
-  if (t.includes("contrato")) return "CONTRATO_SOCIAL";
-  if (t.includes("ata")) return "ATA_REUNIAO";
-  if (t.includes("declara")) return "DECLARACAO_ACESSORIA";
+  if (t.includes("concili")) return "CONCILIACAO_FINANCEIRA";
+  if (t.includes("pagar") || t.includes("receber") || t.includes("boleto")) return "CONTAS_PAGAR_RECEBER";
+  if (t.includes("recibo") || t.includes("despesa")) return "RECIBO_DESPESA";
+  if (t.includes("contrato") || t.includes("socio") || t.includes("sócio")) return "CONTRATOS_SOCIOS";
+  if (t.includes("ata") || t.includes("registro")) return "ATAS_E_REGISTROS";
+  if (t.includes("certid") || t.includes("alvar") || t.includes("licen")) return "CERTIDOES_LICENCAS";
+  if (t.includes("processo") || t.includes("intima") || t.includes("notifica")) return "PROCESSOS_FISCAIS_JURIDICOS";
+  if (t.includes("patrimonio") || t.includes("patrimônio") || t.includes("imobilizado")) return "PATRIMONIO_IMOBILIZADO";
+  if (t.includes("estoque") || t.includes("invent")) return "ESTOQUE_CUSTO";
+  if (t.includes("comercio exterior") || t.includes("comércio exterior") || t.includes("cambio") || t.includes("câmbio")) return "COMERCIO_EXTERIOR_CAMBIO";
+  if (t.includes("certificado digital")) return "CERTIFICADO_DIGITAL";
   if (t.includes("empréstimo") || t.includes("financiamento")) return "EMPRESTIMO_FINANCIAMENTO";
+  if (t.includes("seguro") || t.includes("apolice") || t.includes("apólice")) return "SEGUROS_APOLICES";
+  if (t.includes("relatorio") || t.includes("relatório") || t.includes("kpi") || t.includes("dashboard")) return "RELATORIOS_GERENCIAIS";
   if (t.includes("fluxo")) return "FLUXO_CAIXA";
   return "OUTROS";
+}
+
+function badgeSubtipoNota(idAba: string): string | null {
+  const id = (idAba || "").toUpperCase();
+  if (id === "NFE") return "NF-e";
+  if (id === "NFSE") return "NFS-e";
+  if (id === "NFCE") return "NFC-e";
+  if (id === "CTE") return "CT-e";
+  if (id === "MDFE") return "MDF-e";
+  if (id === "CTE_OS") return "CT-e OS";
+  return null;
 }
 
 function DocValidadoKpis({ doc, camposVisiveis }: { doc: DocumentoValidadoItem; camposVisiveis: CampoExtraido[] }) {
   const temDetalhe = doc.detalhamentoDocumento && typeof doc.detalhamentoDocumento === "object";
   const map: Record<string, string> = {};
+  const mapNormalizado: Record<string, string> = {};
   for (const c of camposVisiveis) {
     if (c.nome) map[c.nome] = c.valor ?? "";
+    if (c.nome) mapNormalizado[normalizarChaveCampo(c.nome)] = c.valor ?? "";
   }
+  const obterValor = (...nomes: string[]): string => {
+    for (const nome of nomes) {
+      const direto = map[nome];
+      if (direto && direto.trim()) return direto;
+      const normalizado = mapNormalizado[normalizarChaveCampo(nome)];
+      if (normalizado && normalizado.trim()) return normalizado;
+    }
+    return "";
+  };
+
   let valorTitulo = "Valor";
   let valorVal = "—";
   if (temDetalhe) {
@@ -112,28 +243,35 @@ function DocValidadoKpis({ doc, camposVisiveis }: { doc: DocumentoValidadoItem; 
     if (tot && typeof tot === "object") {
       if (tot.valorLiquidoBr) {
         valorTitulo = "Valor líquido";
-        valorVal = String(tot.valorLiquidoBr);
+        valorVal = formatarMoedaBr(String(tot.valorLiquidoBr));
       } else if (tot.valorLiquidoNumerico != null) {
         valorTitulo = "Valor líquido";
-        valorVal = String(tot.valorLiquidoNumerico);
+        valorVal = formatarMoedaBr(String(tot.valorLiquidoNumerico));
       }
     }
   } else {
     if (map.valorLiquidoBr) {
       valorTitulo = "Valor líquido";
-      valorVal = map.valorLiquidoBr;
+      valorVal = formatarMoedaBr(map.valorLiquidoBr);
     } else if (map.valorLiquidoNumerico) {
       valorTitulo = "Valor líquido";
-      valorVal = map.valorLiquidoNumerico;
+      valorVal = formatarMoedaBr(map.valorLiquidoNumerico);
     }
+  }
+  if (valorVal === "—") {
+    const valorCampo = obterValor("valor", "valorBruto", "valorDocumento");
+    if (valorCampo) valorVal = formatarMoedaBr(valorCampo);
   }
   const cnpjDig = map.cnpj || "";
   const cnpjFmt =
     cnpjDig && String(cnpjDig).replace(/\D/g, "").length === 14
       ? formatarCnpj(String(cnpjDig).replace(/\D/g, ""))
       : cnpjDig || "—";
-  const comp = map.competencia || "—";
-  const ven = map.vencimento || "—";
+  const compDireta = obterValor("competencia", "referencia", "periodoApuracao");
+  const compInferida = compDireta || competenciaDeData(obterValor("dataResponsavelInformacoes", "Data", "data"));
+  const comp = compInferida || "—";
+  const venDireto = obterValor("vencimento", "dataVencimento", "dataLimitePagamento");
+  const ven = venDireto || (compInferida ? vencimentoDeCompetencia(compInferida) : "") || "—";
 
   return (
     <div className="doc-validado-kpis-react" role="group" aria-label="Resumo do documento">
@@ -160,24 +298,51 @@ function DocValidadoKpis({ doc, camposVisiveis }: { doc: DocumentoValidadoItem; 
 function DocValidadoCard({
   doc,
   editavel,
+  podeReprocessar,
   sessao,
   onSalvo
 }: {
   doc: DocumentoValidadoItem;
   editavel: boolean;
+  podeReprocessar: boolean;
   sessao: Sessao;
   onSalvo: () => void;
 }) {
   const holeritePrefix = "holerite.";
   const temDetalhe = doc.detalhamentoDocumento && typeof doc.detalhamentoDocumento === "object";
   const campos = doc.campos || [];
+  const captura = doc.capturaPerfil || "";
+  const tipoEstruturaDetalhe =
+    doc.detalhamentoDocumento && typeof doc.detalhamentoDocumento === "object"
+      ? String((doc.detalhamentoDocumento as Record<string, unknown>).tipoEstrutura || "")
+      : "";
+  const temPainelGuia = captura === "GUIA_IMPOSTO_IRPF_COMPLETO" || tipoEstruturaDetalhe === "GUIA_IMPOSTO_IRPF";
+  const nomesCamposGuia = useMemo(
+    () => (temPainelGuia ? nomesCamposGuiaDoDetalhe(doc.detalhamentoDocumento) : new Set<string>()),
+    [temPainelGuia, doc.detalhamentoDocumento]
+  );
   const camposTabela = useMemo(
-    () => (temDetalhe ? campos.filter((c) => !String(c.nome || "").startsWith(holeritePrefix)) : campos),
-    [temDetalhe, campos]
+    () =>
+      temDetalhe
+        ? campos.filter((c) => {
+            const nome = String(c.nome || "");
+            if (nome.startsWith(holeritePrefix)) return false;
+            if (temPainelGuia && nomesCamposGuia.has(nome)) return false;
+            return true;
+          })
+        : campos,
+    [temDetalhe, campos, temPainelGuia, nomesCamposGuia]
   );
   const camposOcultos = useMemo(
-    () => (temDetalhe ? campos.filter((c) => String(c.nome || "").startsWith(holeritePrefix)) : []),
-    [temDetalhe, campos]
+    () =>
+      temDetalhe
+        ? campos.filter((c) => {
+            const nome = String(c.nome || "");
+            if (nome.startsWith(holeritePrefix)) return true;
+            return temPainelGuia && nomesCamposGuia.has(nome);
+          })
+        : [],
+    [temDetalhe, campos, temPainelGuia, nomesCamposGuia]
   );
   const camposEdicao = useMemo(() => [...camposTabela, ...camposOcultos], [camposTabela, camposOcultos]);
 
@@ -197,13 +362,31 @@ function DocValidadoCard({
     setValores(o);
   }, [doc.processamentoId, camposEdicao]);
 
+  const rejeitado = doc.status === "REJEITADO";
   const conf = doc.confianca != null ? Number(doc.confianca).toFixed(2) : "—";
   const confPct = doc.confianca != null ? Math.round(Number(doc.confianca) * 100) : null;
-  const captura = doc.capturaPerfil || "";
   const inicial = (doc.nomeArquivoOriginal || "Arquivo").slice(0, 1).toUpperCase();
 
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "err"; text: string } | null>(null);
+  const [reprocessando, setReprocessando] = useState(false);
+
+  async function reprocessar() {
+    setMsg(null);
+    setReprocessando(true);
+    try {
+      await apiFetchJson(`/api/inteligencia/documentos/${doc.processamentoId}/reprocessar`, {
+        method: "POST",
+        sessao
+      });
+      setMsg({ tipo: "ok", text: "Reprocessamento concluído." });
+      onSalvo();
+    } catch (e) {
+      setMsg({ tipo: "err", text: e instanceof Error ? e.message : "Falha ao reprocessar." });
+    } finally {
+      setReprocessando(false);
+    }
+  }
 
   async function salvar(ev: FormEvent) {
     ev.preventDefault();
@@ -251,8 +434,14 @@ function DocValidadoCard({
             <span className="doc-chip-react doc-chip--tipo" title="Tipo detectado pela IA">
               {doc.tipoDocumentoDetectado || "—"}
             </span>
+            {rejeitado ? (
+              <span className="doc-chip-react doc-chip--erro" title="Documento rejeitado pela IA — clique em Reprocessar IA">Rejeitado</span>
+            ) : null}
             {captura === "HOLERITE_ESCRITORIO_COMPLETO" ? (
               <span className="doc-chip-react doc-chip--accent">Captura completa</span>
+            ) : null}
+            {temPainelGuia ? (
+              <span className="doc-chip-react doc-chip--accent">Guia estruturada</span>
             ) : null}
             <span className="doc-chip-react doc-chip--conf" title="Confiança da leitura">
               {confPct != null ? `${confPct}%` : conf} confiança
@@ -264,9 +453,21 @@ function DocValidadoCard({
 
       <DocValidadoKpis doc={doc} camposVisiveis={campos} />
 
-      {temDetalhe && doc.detalhamentoDocumento ? (
+      {temDetalhe && doc.detalhamentoDocumento && captura === "HOLERITE_ESCRITORIO_COMPLETO" ? (
         <div className="doc-validado-holerite-react">
           <HoleritePainelDetalhe det={doc.detalhamentoDocumento} capturaPerfil={captura} />
+        </div>
+      ) : null}
+      {temDetalhe && doc.detalhamentoDocumento && temPainelGuia ? (
+        <div className="doc-validado-holerite-react">
+          <GuiaImpostoPainelDetalhe
+            det={doc.detalhamentoDocumento}
+            capturaPerfil={captura || "GUIA_IMPOSTO_IRPF_COMPLETO"}
+            editavel={editavel}
+            valores={valores}
+            tipoPorCampo={Object.fromEntries(campos.map((c) => [c.nome, c.tipo]))}
+            onValorChange={(nome, valor) => setValores((prev) => ({ ...prev, [nome]: valor }))}
+          />
         </div>
       ) : null}
 
@@ -302,7 +503,7 @@ function DocValidadoCard({
                             onChange={(e) => setValores((prev) => ({ ...prev, [c.nome]: e.target.value }))}
                           />
                         ) : (
-                          <span className="doc-campo-item-react__valor-texto">{c.valor ?? ""}</span>
+                          <span className="doc-campo-item-react__valor-texto">{formatarValorExibicao(c.valor, c.tipo)}</span>
                         )}
                       </div>
                       <div className="doc-campo-item-react__tipo" role="cell">
@@ -326,14 +527,33 @@ function DocValidadoCard({
         ) : null}
       </div>
 
-      {editavel && (camposTabela.length > 0 || camposOcultos.length > 0) ? (
+      {editavel && (camposTabela.length > 0 || camposOcultos.length > 0 || (podeReprocessar && rejeitado)) ? (
         <form className="doc-validado-card__actions-react" onSubmit={salvar}>
-          <p className="doc-validado-card__actions-tip-react muted-react">
-            Revise os campos e salve para atualizar a análise deste documento.
-          </p>
-          <button type="submit" className="ghost small-btn" disabled={salvando}>
-            {salvando ? "Salvando..." : "Salvar alterações"}
-          </button>
+          {camposTabela.length > 0 || camposOcultos.length > 0 ? (
+            <p className="doc-validado-card__actions-tip-react muted-react">
+              Revise os campos e salve para atualizar a análise deste documento.
+            </p>
+          ) : (
+            <p className="doc-validado-card__actions-tip-react muted-react">
+              Documento rejeitado. Clique em <strong>Reprocessar IA</strong> para tentar a extração novamente.
+            </p>
+          )}
+          {(camposTabela.length > 0 || camposOcultos.length > 0) ? (
+            <button type="submit" className="ghost small-btn" disabled={salvando || reprocessando}>
+              {salvando ? "Salvando..." : "Salvar alterações"}
+            </button>
+          ) : null}
+          {podeReprocessar ? (
+            <button
+              type="button"
+              className="ghost small-btn"
+              disabled={salvando || reprocessando}
+              onClick={() => void reprocessar()}
+              title="Relê o arquivo original com a extração mais recente"
+            >
+              {reprocessando ? "Reprocessando..." : "Reprocessar IA"}
+            </button>
+          ) : null}
           {msg ? <span className={msg.tipo === "ok" ? "ok" : "erro"}>{msg.text}</span> : null}
         </form>
       ) : null}
@@ -552,6 +772,8 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
               {abas.map((a, i) => {
                 const n = (a.documentos || []).length;
                 const idKey = idAbaFromPayload(a);
+                const idCss = idKey.toLowerCase().replace(/_/g, "-");
+                const badgeNota = badgeSubtipoNota(idKey);
                 return (
                   <button
                     key={`${a.idAba}-${i}`}
@@ -560,7 +782,7 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
                     }}
                     type="button"
                     role="tab"
-                    className={`doc-tab doc-tab--carousel ${i === tabIdx ? "doc-tab--active" : ""}`}
+                    className={`doc-tab doc-tab--carousel doc-tab--${idCss} ${i === tabIdx ? "doc-tab--active" : ""}`}
                     aria-selected={i === tabIdx}
                     title={a.titulo}
                     onClick={() => setTabIdx(i)}
@@ -575,6 +797,7 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
                         </span>
                       ) : null}
                     </span>
+                    {badgeNota ? <span className="doc-tab-carousel__subtipo-badge">{badgeNota}</span> : null}
                     <span className="doc-tab-carousel__label">{a.titulo}</span>
                   </button>
                 );
@@ -623,6 +846,7 @@ export function DocsValidadosPage({ sessao }: { sessao: Sessao }) {
                   key={d.processamentoId}
                   doc={d}
                   editavel={editavel}
+                  podeReprocessar={perfil === "CONTADOR"}
                   sessao={sessao}
                   onSalvo={() => void carregar()}
                 />

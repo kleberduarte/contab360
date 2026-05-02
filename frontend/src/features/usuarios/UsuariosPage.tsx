@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useDeferredValue, useMemo, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
+import { formatApiError } from "../../lib/errors";
 import { Sessao } from "../../lib/session";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 
@@ -11,10 +12,17 @@ type Usuario = {
   perfil: string;
   empresaId: number | null;
   empresaNome: string | null;
+  clientePessoaFisicaId: number | null;
+  clientePessoaFisicaNome: string | null;
   ativo: boolean;
 };
 type UsuarioResponse = Usuario & { senhaTempRevelada?: string | null };
-type FormState = { nome: string; email: string; perfil: string; empresaId: string };
+type FormState = {
+  nome: string;
+  email: string;
+  perfil: string;
+  empresaId: string;
+};
 
 const PERFIS_ADM = ["ADM", "CONTADOR", "CLIENTE"];
 const PERFIS_CONTADOR = ["CLIENTE"];
@@ -117,7 +125,8 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
       }
       await carregar();
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+      const msg = e instanceof Error ? e.message : "Erro ao salvar.";
+      setErro(formatApiError(msg, "usuarios"));
     }
   }
 
@@ -231,7 +240,6 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
               ))}
             </select>
           </label>
-
           <div className="usuarios-react-actions">
             <button type="submit">{editandoId ? "Salvar alterações" : "Criar usuário"}</button>
             {editandoId != null ? (
@@ -242,7 +250,11 @@ export function UsuariosPage({ sessao }: { sessao: Sessao }) {
               </>
             ) : null}
           </div>
-          {erro ? <p className="erro">{erro}</p> : null}
+          {erro ? (
+            <p className="erro" role="alert" aria-live="assertive">
+              {erro}
+            </p>
+          ) : null}
           {ok && !senhaTempRevelada ? <p className="ok">{ok}</p> : null}
         </form>
 

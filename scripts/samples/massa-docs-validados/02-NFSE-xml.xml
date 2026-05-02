@@ -1,0 +1,46 @@
+﻿# === Metadados massa Contab360 (gerado por scripts/generate_doc_test_mass.ps1) ===
+# escopo_pendencia (massa): PJ
+#   PJ -> nome empresarial de referencia: ACME SERVICOS CONTABEIS LTDA
+#   PF -> nome da pessoa fisica de referencia: Maria Fernanda Costa Oliveira | CPF 529.982.247-25 (52998224725)
+# Ajuste as pendencias para competencia 2026-04 e CNPJ da empresa = 12.345.678/0001-95 (12345678000195) quando aplicavel.
+# tipo_documento_detectado_esperado: NFSE_XML
+# aba_carrossel_esperada: NFSE
+# fonte_leitura: xml
+#
+# Estrutura JSON gravada em dadosExtraidosJson (resumo):
+#   fonte, tipoDocumento, status, confianca, camposObrigatorios[], camposExtraidos{}, motivosRevisao[]
+#   + detalhamentoDocumento? + capturaPerfil? (holerite / guia IRPF completos)
+#
+# Chaves tipicas em camposExtraidos para este cenario:
+#   - cnpjEmitente
+#   - cnpjDestinatario
+#   - valor
+#   - competencia
+#   - vencimento
+#   - tributo
+#   - tipoDocumento
+# === Fim metadados / inicio do texto simulado ===
+
+<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse>
+  <Nfse>
+    <InfNfse>
+      <PrestadorServico>
+        <RazaoSocial>ACME SERVICOS CONTABEIS LTDA</RazaoSocial>
+        <IdentificacaoPrestador><Cnpj>12345678000195</Cnpj></IdentificacaoPrestador>
+      </PrestadorServico>
+      <TomadorServico>
+        <RazaoSocial>BETA INDUSTRIA E COMERCIO LTDA</RazaoSocial>
+        <IdentificacaoTomador><CpfCnpj><Cnpj>11222333000181</Cnpj></CpfCnpj></IdentificacaoTomador>
+      </TomadorServico>
+      <Competencia>04/2026</Competencia>
+      <dVenc>20/05/2026</dVenc>
+      <Servico>
+        <Valores>
+          <ValorServicos>2500.00</ValorServicos>
+          <ValorLiquidoNfse>2375.00</ValorLiquidoNfse>
+        </Valores>
+      </Servico>
+    </InfNfse>
+  </Nfse>
+</CompNfse>

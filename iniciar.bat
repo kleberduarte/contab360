@@ -70,8 +70,8 @@ if errorlevel 1 (
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 1" >nul
 
-echo [%TIME%] Subindo Spring Boot em nova janela (clean + run, logs aparecem la^)...
-start "%TITULO_JANELA%" /D "%~dp0" cmd /k "mvn clean spring-boot:run"
+echo [%TIME%] Subindo Spring Boot em nova janela (clean + run [profile dev], logs aparecem la^)...
+start "%TITULO_JANELA%" /D "%~dp0" cmd /k "mvn clean spring-boot:run -Dspring-boot.run.profiles=dev"
 if not "%FRONTEND_DIR%"=="" (
   echo [%TIME%] Subindo Frontend em nova janela...
   start "%TITULO_JANELA_FRONT%" /D "%FRONTEND_DIR%" cmd /k "npm run dev"

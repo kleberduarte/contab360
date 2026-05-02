@@ -9,6 +9,8 @@ import com.contabilidade.pj.empresa.entity.Empresa;
 
 public interface EmpresaRepository extends JpaRepository<Empresa, Long> {
 
+    boolean existsByCnpj(String cnpj);
+
     boolean existsByCnpjAndIdNot(String cnpj, Long id);
 
     List<Empresa> findAllByAtivoTrue();

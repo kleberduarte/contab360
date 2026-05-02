@@ -2,6 +2,8 @@ package com.contabilidade.pj.pendencia.controller;
 
 import com.contabilidade.pj.auth.service.AuthContext;
 import com.contabilidade.pj.auth.entity.Usuario;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -10,6 +12,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,19 +37,37 @@ import com.contabilidade.pj.pendencia.repository.*;
 @RestController
 @RequestMapping("/api/pendencias")
 public class PendenciaDocumentoController {
+    private static final List<String> CAMPOS_GUIA_IRPF_OBRIGATORIOS_EXIBICAO = List.of(
+            "nomeFontePagadora",
+            "cnpjCpfFontePagadora",
+            "nomeBeneficiario",
+            "cpfBeneficiario",
+            "naturezaRendimento",
+            "totalDosRendimentosInclusiveFerias",
+            "contribuicaoPrevidenciariaOficial",
+            "contribuicaoEntidadesPrevidenciaComplementarPublicaOuPrivadaEFapi",
+            "pensaoAlimenticia",
+            "impostoSobreARendaRetidoNaFonte",
+            "informacoesComplementaresTexto",
+            "Nome",
+            "dataResponsavelInformacoes"
+    );
 
     private final PendenciaDocumentoService pendenciaDocumentoService;
     private final DocumentoProcessamentoRepository documentoProcessamentoRepository;
     private final DocumentoInteligenciaService documentoInteligenciaService;
+    private final ObjectMapper objectMapper;
 
     public PendenciaDocumentoController(
             PendenciaDocumentoService pendenciaDocumentoService,
             DocumentoProcessamentoRepository documentoProcessamentoRepository,
-            DocumentoInteligenciaService documentoInteligenciaService
+            DocumentoInteligenciaService documentoInteligenciaService,
+            ObjectMapper objectMapper
     ) {
         this.pendenciaDocumentoService = pendenciaDocumentoService;
         this.documentoProcessamentoRepository = documentoProcessamentoRepository;
         this.documentoInteligenciaService = documentoInteligenciaService;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping("/{pendenciaId}/dados-extraidos")
@@ -122,7 +144,15 @@ public class PendenciaDocumentoController {
         if (usuario == null) {
             throw new IllegalArgumentException("Usuário não autenticado.");
         }
-        int criadas = pendenciaDocumentoService.gerarPendencias(req.ano(), req.mes(), req.diaVencimento(), usuario);
+        int criadas = pendenciaDocumentoService.gerarPendencias(
+                req.ano(),
+                req.mes(),
+                req.diaVencimento(),
+                req.empresaId(),
+                req.clientePessoaFisicaId(),
+                req.templateDocumentoId(),
+                usuario
+        );
         return Map.of("pendenciasCriadas", criadas);
     }
 
@@ -148,15 +178,106 @@ public class PendenciaDocumentoController {
         return documentoProcessamentoRepository.findUltimasObservacoesByPendenciaIds(pendenciaIds).stream()
                 .collect(Collectors.toMap(
                         DocumentoProcessamentoRepository.ObservacaoPendenciaView::getPendenciaId,
-                        DocumentoProcessamentoRepository.ObservacaoPendenciaView::getObservacaoProcessamento,
+                        this::montarObservacaoComCamposFaltantes,
                         (valorAtual, ignorar) -> valorAtual
                 ));
+    }
+
+    private String montarObservacaoComCamposFaltantes(DocumentoProcessamentoRepository.ObservacaoPendenciaView view) {
+        String observacao = view.getObservacaoProcessamento();
+        if (view.getStatus() != ProcessamentoStatus.REJEITADO) {
+            return observacao;
+        }
+        List<String> faltantes = extrairCamposObrigatoriosFaltantes(view.getDadosExtraidosJson());
+        String sufixo = faltantes.isEmpty()
+                ? "Campos faltando preenchimento: não identificado pela IA."
+                : "Campos faltando preenchimento: " + String.join(", ", faltantes) + ".";
+        if (observacao == null || observacao.isBlank()) {
+            return sufixo;
+        }
+        if (observacao.contains("Campos faltando preenchimento:")) {
+            return observacao;
+        }
+        return observacao + " " + sufixo;
+    }
+
+    private List<String> extrairCamposObrigatoriosFaltantes(String dadosExtraidosJson) {
+        if (dadosExtraidosJson == null || dadosExtraidosJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonNode raiz = objectMapper.readTree(dadosExtraidosJson);
+            JsonNode extraidos = raiz.path("camposExtraidos");
+            Map<String, String> chavesParaExibir = camposObrigatoriosParaExibicao(raiz);
+            if (chavesParaExibir.isEmpty()) {
+                return List.of();
+            }
+            List<String> faltantes = new ArrayList<>();
+            for (Map.Entry<String, String> item : chavesParaExibir.entrySet()) {
+                String chave = item.getKey();
+                String valor = "";
+                if (extraidos.isObject() && extraidos.has(chave) && !extraidos.get(chave).isNull()) {
+                    valor = extraidos.get(chave).asText("");
+                }
+                if (("Nome".equals(chave)) && (valor == null || valor.isBlank())
+                        && extraidos.isObject() && extraidos.has("nomeResponsavelInformacoes")
+                        && !extraidos.get("nomeResponsavelInformacoes").isNull()) {
+                    valor = extraidos.get("nomeResponsavelInformacoes").asText("");
+                }
+                if (valor == null || valor.isBlank()) {
+                    faltantes.add(item.getValue());
+                }
+            }
+            return faltantes;
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    private Map<String, String> camposObrigatoriosParaExibicao(JsonNode raiz) {
+        Map<String, String> campos = new LinkedHashMap<>();
+        JsonNode obrigatorios = raiz.path("camposObrigatorios");
+        if (obrigatorios.isArray()) {
+            for (JsonNode obrigatorio : obrigatorios) {
+                if (!obrigatorio.isTextual()) {
+                    continue;
+                }
+                String chave = obrigatorio.asText("");
+                if (chave.isBlank()) {
+                    continue;
+                }
+                campos.putIfAbsent(chave, formatarNomeCampo(chave));
+            }
+        }
+
+        String tipo = raiz.path("tipoDocumento").asText("");
+        String capturaPerfil = raiz.path("capturaPerfil").asText("");
+        if (("GUIA_IRPF".equals(tipo) || "GUIA_IMPOSTO".equals(tipo)) && capturaPerfil.startsWith("GUIA_IMPOSTO_IRPF")) {
+            for (String chaveIrpf : CAMPOS_GUIA_IRPF_OBRIGATORIOS_EXIBICAO) {
+                campos.putIfAbsent(chaveIrpf, formatarNomeCampo(chaveIrpf));
+            }
+        }
+        return campos;
+    }
+
+    private static String formatarNomeCampo(String chave) {
+        if (chave == null || chave.isBlank()) {
+            return "";
+        }
+        String base = chave.replaceAll("([a-z])([A-Z])", "$1 $2").replace('_', ' ').trim();
+        if (base.isEmpty()) {
+            return chave;
+        }
+        return Character.toUpperCase(base.charAt(0)) + base.substring(1);
     }
 
     public record GerarPendenciasRequest(
             @NotNull @Min(2000) @Max(2100) Integer ano,
             @NotNull @Min(1) @Max(12) Integer mes,
-            @NotNull @Min(1) @Max(31) Integer diaVencimento
+            @NotNull @Min(1) @Max(31) Integer diaVencimento,
+            Long empresaId,
+            Long clientePessoaFisicaId,
+            Long templateDocumentoId
     ) {
     }
 

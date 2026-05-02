@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
+import { formatApiError } from "../../lib/errors";
 import { Sessao } from "../../lib/session";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 
@@ -128,7 +129,8 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
       }
       await carregar();
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+      const msg = e instanceof Error ? e.message : "Erro ao salvar.";
+      setErro(formatApiError(msg, "clientesPf"));
     }
   }
 
@@ -225,7 +227,11 @@ export function ClientesPfPage({ sessao }: { sessao: Sessao }) {
             </label>
           </div>
           {ok ? <p className="ok">{ok}</p> : null}
-          {erro ? <p className="erro">{erro}</p> : null}
+          {erro ? (
+            <p className="erro" role="alert" aria-live="assertive">
+              {erro}
+            </p>
+          ) : null}
           {carregando ? <p className="muted-react">Carregando…</p> : null}
           {!carregando && filtradas.length === 0 ? <p className="muted-react">Nenhum cadastro encontrado.</p> : null}
           <table className="empresas-react-table">

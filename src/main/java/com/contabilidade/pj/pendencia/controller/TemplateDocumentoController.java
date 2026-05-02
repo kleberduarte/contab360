@@ -8,12 +8,15 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 import com.contabilidade.pj.pendencia.service.*;
 import com.contabilidade.pj.pendencia.entity.*;
 
@@ -49,6 +52,15 @@ public class TemplateDocumentoController {
         return lista.stream().map(TemplateDocumentoResponse::fromEntity).toList();
     }
 
+    @GetMapping("/sugestoes")
+    public List<String> listarSugestoes() {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        return templateDocumentoService.listarSugestoesNomes();
+    }
+
     @PostMapping
     public ResponseEntity<TemplateDocumentoResponse> criar(@Valid @RequestBody CriarTemplateDocumentoRequest req) {
         Usuario usuario = AuthContext.get();
@@ -65,9 +77,38 @@ public class TemplateDocumentoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(TemplateDocumentoResponse.fromEntity(salvo));
     }
 
+    @PutMapping("/{id}")
+    public TemplateDocumentoResponse atualizar(
+            @PathVariable Long id,
+            @Valid @RequestBody AtualizarTemplateDocumentoRequest req
+    ) {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        TemplateDocumento salvo = templateDocumentoService.atualizar(id, req.nome(), req.obrigatorio(), usuario);
+        return TemplateDocumentoResponse.fromEntity(salvo);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> remover(@PathVariable Long id) {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        templateDocumentoService.remover(id, usuario);
+        return ResponseEntity.noContent().build();
+    }
+
     public record CriarTemplateDocumentoRequest(
             Long empresaId,
             Long clientePessoaFisicaId,
+            @NotBlank String nome,
+            boolean obrigatorio
+    ) {
+    }
+
+    public record AtualizarTemplateDocumentoRequest(
             @NotBlank String nome,
             boolean obrigatorio
     ) {
