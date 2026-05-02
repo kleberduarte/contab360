@@ -19,6 +19,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     boolean existsByEmailAndIdNot(String email, Long id);
 
-    @Query("SELECT u FROM Usuario u LEFT JOIN FETCH u.empresa ORDER BY u.nome")
+    @Query("SELECT u FROM Usuario u LEFT JOIN FETCH u.empresa LEFT JOIN FETCH u.clientePessoaFisica ORDER BY u.nome")
     List<Usuario> findAllComEmpresa();
 }

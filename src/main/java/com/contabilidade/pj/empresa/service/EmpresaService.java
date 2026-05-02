@@ -36,6 +36,27 @@ public class EmpresaService {
         if (usuarioAtual.getPerfil() == PerfilUsuario.CLIENTE) {
             throw new IllegalArgumentException("Cliente não pode cadastrar empresa.");
         }
+        String cnpjDigits = empresa.getCnpj() == null ? "" : empresa.getCnpj().replaceAll("\\D", "");
+        if (cnpjDigits.length() != 14) {
+            throw new IllegalArgumentException("CNPJ deve conter 14 dígitos.");
+        }
+        if (empresa.getRazaoSocial() == null || empresa.getRazaoSocial().isBlank()) {
+            throw new IllegalArgumentException("Razão social é obrigatória.");
+        }
+        empresa.setCnpj(cnpjDigits);
+        empresa.setRazaoSocial(empresa.getRazaoSocial().trim());
+        if (empresaRepository.existsByCnpj(cnpjDigits)) {
+            throw new IllegalArgumentException(
+                    "Já existe empresa com este CNPJ (ativa ou inativa). Reative o cadastro existente (opção \"Mostrar empresas inativas\") ou informe outro CNPJ.");
+        }
+        String cpfDigits = empresa.getCpfResponsavel() == null ? "" : empresa.getCpfResponsavel().replaceAll("\\D", "");
+        if (cpfDigits.isEmpty()) {
+            empresa.setCpfResponsavel(null);
+        } else if (cpfDigits.length() != 11) {
+            throw new IllegalArgumentException("CPF do responsável deve ter 11 dígitos.");
+        } else {
+            empresa.setCpfResponsavel(cpfDigits);
+        }
         empresa.setAtivo(true);
         return empresaRepository.save(empresa);
     }

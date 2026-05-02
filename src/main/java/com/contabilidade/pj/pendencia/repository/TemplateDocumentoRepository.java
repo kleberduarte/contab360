@@ -13,4 +13,12 @@ public interface TemplateDocumentoRepository extends JpaRepository<TemplateDocum
     List<TemplateDocumento> findByEmpresaIdOrderByNomeAsc(Long empresaId);
 
     List<TemplateDocumento> findByClientePessoaFisicaIdOrderByNomeAsc(Long clientePessoaFisicaId);
+
+    boolean existsByEmpresaIdAndNomeIgnoreCase(Long empresaId, String nome);
+
+    boolean existsByClientePessoaFisicaIdAndNomeIgnoreCase(Long clientePessoaFisicaId, String nome);
+
+    boolean existsByEmpresaIdAndNomeIgnoreCaseAndIdNot(Long empresaId, String nome, Long id);
+
+    boolean existsByClientePessoaFisicaIdAndNomeIgnoreCaseAndIdNot(Long clientePessoaFisicaId, String nome, Long id);
 }

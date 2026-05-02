@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -24,14 +25,17 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import org.apache.pdfbox.Loader;
@@ -46,12 +50,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 import com.contabilidade.pj.pendencia.entity.*;
 import com.contabilidade.pj.pendencia.repository.*;
 import com.contabilidade.pj.pendencia.dto.*;
 
 @Service
 public class DocumentoInteligenciaService {
+    private static final int LIMITE_NOME_CAMPO_PERSISTIDO = 120;
 
     private static final Pattern CNPJ_PATTERN = Pattern.compile("\\b\\d{14}\\b");
     private static final Pattern CNPJ_FORMATADO_PATTERN = Pattern.compile("\\b\\d{2}\\.?\\d{3}\\.?\\d{3}[/\\-]?\\d{4}[\\-]?\\d{2}\\b");
@@ -83,6 +89,7 @@ public class DocumentoInteligenciaService {
     private final EmpresaRepository empresaRepository;
     private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final CompetenciaArquivamentoService competenciaArquivamentoService;
+    private final DocTabMapperService docTabMapperService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentoInteligenciaService(
@@ -93,7 +100,8 @@ public class DocumentoInteligenciaService {
             PendenciaDocumentoRepository pendenciaDocumentoRepository,
             EmpresaRepository empresaRepository,
             ClientePessoaFisicaRepository clientePessoaFisicaRepository,
-            CompetenciaArquivamentoService competenciaArquivamentoService
+            CompetenciaArquivamentoService competenciaArquivamentoService,
+            DocTabMapperService docTabMapperService
     ) {
         this.documentoProcessamentoRepository = documentoProcessamentoRepository;
         this.documentoDadoExtraidoRepository = documentoDadoExtraidoRepository;
@@ -103,6 +111,7 @@ public class DocumentoInteligenciaService {
         this.empresaRepository = empresaRepository;
         this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
         this.competenciaArquivamentoService = competenciaArquivamentoService;
+        this.docTabMapperService = docTabMapperService;
     }
 
     @Transactional
@@ -124,12 +133,27 @@ public class DocumentoInteligenciaService {
         try {
             processarArquivo(processamento, Path.of(entrega.getCaminhoArquivo()));
         } catch (Exception ex) {
-            processamento.setStatus(ProcessamentoStatus.ERRO);
-            processamento.setObservacaoProcessamento("Falha no processamento: " + ex.getMessage());
-            processamento.setAtualizadoEm(LocalDateTime.now());
-            documentoProcessamentoRepository.save(processamento);
+            throw new IllegalStateException("Falha no processamento: " + ex.getMessage(), ex);
         }
 
+        return processamento;
+    }
+
+    @Transactional
+    public DocumentoProcessamento reprocessar(Long processamentoId, Usuario usuarioAtual) {
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
+            throw new IllegalArgumentException("Apenas contador pode reprocessar documentos.");
+        }
+        DocumentoProcessamento processamento = documentoProcessamentoRepository.findById(processamentoId)
+                .orElseThrow(() -> new IllegalArgumentException("Processamento não encontrado."));
+        processamento.setStatus(ProcessamentoStatus.PROCESSANDO);
+        processamento.setAtualizadoEm(LocalDateTime.now());
+        documentoProcessamentoRepository.save(processamento);
+        try {
+            processarArquivo(processamento, Path.of(processamento.getEntrega().getCaminhoArquivo()));
+        } catch (Exception ex) {
+            throw new IllegalStateException("Falha no reprocessamento: " + ex.getMessage(), ex);
+        }
         return processamento;
     }
 
@@ -390,16 +414,21 @@ public class DocumentoInteligenciaService {
         throw new IllegalArgumentException("Informe empresaId ou clientePessoaFisicaId.");
     }
 
+    private static final List<ProcessamentoStatus> STATUS_VISIVEIS_CONTADOR = List.of(
+            ProcessamentoStatus.PROCESSADO, ProcessamentoStatus.REJEITADO);
+
     private List<DocumentoProcessamento> carregarProcessamentosPj(
             PerfilUsuario perfil,
             Long empresaId,
             boolean incluirCompetenciasArquivadas
     ) {
-        if (perfil == PerfilUsuario.CONTADOR && !incluirCompetenciasArquivadas) {
-            return documentoProcessamentoRepository.findByEmpresaIdAndStatusExcluindoCompetenciaArquivada(
-                    empresaId,
-                    ProcessamentoStatus.PROCESSADO
-            );
+        if (perfil == PerfilUsuario.CONTADOR) {
+            if (!incluirCompetenciasArquivadas) {
+                return documentoProcessamentoRepository.findByEmpresaIdAndStatusInExcluindoCompetenciaArquivada(
+                        empresaId, STATUS_VISIVEIS_CONTADOR);
+            }
+            return documentoProcessamentoRepository.findByEmpresaIdAndStatusIn(
+                    empresaId, STATUS_VISIVEIS_CONTADOR);
         }
         return documentoProcessamentoRepository.findByEmpresaIdAndStatus(empresaId, ProcessamentoStatus.PROCESSADO);
     }
@@ -409,19 +438,19 @@ public class DocumentoInteligenciaService {
             Long clientePfId,
             boolean incluirCompetenciasArquivadas
     ) {
-        if (perfil == PerfilUsuario.CONTADOR && !incluirCompetenciasArquivadas) {
-            return documentoProcessamentoRepository.findByClientePessoaFisicaIdAndStatusExcluindoCompetenciaArquivada(
-                    clientePfId,
-                    ProcessamentoStatus.PROCESSADO
-            );
+        if (perfil == PerfilUsuario.CONTADOR) {
+            if (!incluirCompetenciasArquivadas) {
+                return documentoProcessamentoRepository.findByClientePessoaFisicaIdAndStatusInExcluindoCompetenciaArquivada(
+                        clientePfId, STATUS_VISIVEIS_CONTADOR);
+            }
+            return documentoProcessamentoRepository.findByClientePessoaFisicaIdAndStatusIn(
+                    clientePfId, STATUS_VISIVEIS_CONTADOR);
         }
         return documentoProcessamentoRepository.findByClientePessoaFisicaIdAndStatus(
-                clientePfId,
-                ProcessamentoStatus.PROCESSADO
-        );
+                clientePfId, ProcessamentoStatus.PROCESSADO);
     }
 
-    private static DocumentosValidadosAgrupadosResponse abasVaziasTomador(
+    private DocumentosValidadosAgrupadosResponse abasVaziasTomador(
             Long empresaId,
             String cnpj,
             String razaoSocial,
@@ -429,10 +458,10 @@ public class DocumentoInteligenciaService {
             String cpfClientePf,
             String nomeClientePf
     ) {
-        List<DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse> abas = TipoDocumentoAba.ordemAbas().stream()
+        List<DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse> abas = docTabMapperService.ordemAbas().stream()
                 .map(id -> new DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse(
                         id,
-                        TipoDocumentoAba.tituloAba(id),
+                        docTabMapperService.tituloAba(id),
                         List.of()
                 ))
                 .toList();
@@ -457,13 +486,13 @@ public class DocumentoInteligenciaService {
             List<DocumentoProcessamento> processamentos
     ) {
         Map<String, List<DocumentosValidadosAgrupadosResponse.DocumentoValidadoItemResponse>> porAba = new LinkedHashMap<>();
-        for (String aba : TipoDocumentoAba.ordemAbas()) {
+        for (String aba : docTabMapperService.ordemAbas()) {
             porAba.put(aba, new ArrayList<>());
         }
         for (DocumentoProcessamento dp : processamentos) {
-            String idAba = TipoDocumentoAba.idAbaParaTipoDetectado(dp.getTipoDocumento());
-            List<DadosExtraidosPendenciaDto.CampoExtraido> campos = listarCamposDoProcessamento(dp);
             PendenciaDocumento pend = dp.getEntrega().getPendencia();
+            String idAba = resolverAbaDocumento(dp, pend);
+            List<DadosExtraidosPendenciaDto.CampoExtraido> campos = listarCamposDoProcessamento(dp);
             String jsonProc = dp.getDadosExtraidosJson();
             DocumentosValidadosAgrupadosResponse.DocumentoValidadoItemResponse item =
                     new DocumentosValidadosAgrupadosResponse.DocumentoValidadoItemResponse(
@@ -476,17 +505,18 @@ public class DocumentoInteligenciaService {
                             dp.getConfianca(),
                             campos,
                             extrairDetalhamentoDocumentoDoJson(jsonProc),
-                            extrairCapturaPerfilDoJson(jsonProc)
+                            extrairCapturaPerfilDoJson(jsonProc),
+                            dp.getStatus().name()
                     );
             if (!porAba.containsKey(idAba)) {
                 idAba = "OUTROS";
             }
             porAba.get(idAba).add(item);
         }
-        List<DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse> abas = TipoDocumentoAba.ordemAbas().stream()
+        List<DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse> abas = docTabMapperService.ordemAbas().stream()
                 .map(id -> new DocumentosValidadosAgrupadosResponse.AbaDocumentosResponse(
                         id,
-                        TipoDocumentoAba.tituloAba(id),
+                        docTabMapperService.tituloAba(id),
                         List.copyOf(porAba.getOrDefault(id, List.of()))
                 ))
                 .toList();
@@ -499,6 +529,17 @@ public class DocumentoInteligenciaService {
                 nomeClientePf,
                 abas
         );
+    }
+
+    /**
+     * Prioriza a classificação da IA (tipo detectado) e usa o template como fallback.
+     */
+    private String resolverAbaDocumento(DocumentoProcessamento processamento, PendenciaDocumento pendencia) {
+        String idAba = docTabMapperService.idAbaParaTipoDetectado(processamento.getTipoDocumento());
+        if (!"OUTROS".equals(idAba)) {
+            return idAba;
+        }
+        return docTabMapperService.idAbaParaTemplateNome(pendencia.getTemplateDocumento().getNome());
     }
 
     private static String valorCampoJsonParaExibicao(JsonNode n) {
@@ -546,12 +587,16 @@ public class DocumentoInteligenciaService {
         List<DadosExtraidosPendenciaDto.CampoExtraido> campos = extrairCamposDoJson(processamento.getDadosExtraidosJson());
         int ordem = 0;
         for (DadosExtraidosPendenciaDto.CampoExtraido c : campos) {
+            String nomeCampo = c.nome() == null ? "" : c.nome().trim();
+            if (nomeCampo.isBlank() || nomeCampo.length() > LIMITE_NOME_CAMPO_PERSISTIDO) {
+                continue;
+            }
             DocumentoDadoExtraido linha = new DocumentoDadoExtraido();
             linha.setProcessamento(processamento);
-            linha.setNomeCampo(c.nome());
+            linha.setNomeCampo(nomeCampo);
             linha.setValor(c.valor());
             linha.setOrdem(ordem++);
-            linha.setTipoCampo(inferirTipoCampo(c.nome()));
+            linha.setTipoCampo(inferirTipoCampo(nomeCampo));
             documentoDadoExtraidoRepository.save(linha);
         }
     }
@@ -575,7 +620,10 @@ public class DocumentoInteligenciaService {
             return TipoCampoExtraido.MOEDA;
         }
         if (n.contains("aliquota") || n.contains("deducoesnfse") || n.contains("basecalculo")
-                || n.contains("valoriss") || n.contains("creditoiptu")) {
+                || n.contains("valoriss") || n.contains("creditoiptu")
+                || n.equals("pis") || n.equals("cofins") || n.equals("inss")
+                || n.equals("irrf") || n.equals("csll")
+                || n.contains("valorservicos") || n.contains("valorliquido")) {
             return TipoCampoExtraido.MOEDA;
         }
         return TipoCampoExtraido.TEXTO;
@@ -937,9 +985,137 @@ public class DocumentoInteligenciaService {
         }
     }
 
+    /**
+     * Evita {@code SAXParseException: Content is not allowed in prolog.} por BOM UTF-8, XML gzipado,
+     * UTF-16 com BOM, linhas iniciais de metadado ({@code # ...}) ou texto antes do {@code <?xml} / primeiro {@code <}.
+     */
+    private static byte[] prepararConteudoXmlParaParse(byte[] raw) throws IOException {
+        if (raw == null || raw.length == 0) {
+            return raw == null ? new byte[0] : raw;
+        }
+        if (raw.length >= 3 && raw[0] == (byte) 0xEF && raw[1] == (byte) 0xBB && raw[2] == (byte) 0xBF) {
+            raw = Arrays.copyOfRange(raw, 3, raw.length);
+        }
+        if (raw.length >= 2 && (raw[0] & 0xFF) == 0x1F && (raw[1] & 0xFF) == 0x8B) {
+            try (GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(raw))) {
+                raw = gzin.readAllBytes();
+            }
+            if (raw.length >= 3 && raw[0] == (byte) 0xEF && raw[1] == (byte) 0xBB && raw[2] == (byte) 0xBF) {
+                raw = Arrays.copyOfRange(raw, 3, raw.length);
+            }
+        }
+        if (raw.length >= 2 && raw[0] == (byte) 0xFF && raw[1] == (byte) 0xFE) {
+            raw = new String(raw, StandardCharsets.UTF_16LE).getBytes(StandardCharsets.UTF_8);
+        } else if (raw.length >= 2 && raw[0] == (byte) 0xFE && raw[1] == (byte) 0xFF) {
+            raw = new String(raw, StandardCharsets.UTF_16BE).getBytes(StandardCharsets.UTF_8);
+        }
+        raw = removerLinhasIniciaisMetadadoHash(raw);
+        return cortarAtePrimeiroMarcadorXml(raw);
+    }
+
+    private static boolean isAsciiWs(byte b) {
+        return b == 9 || b == 10 || b == 13 || b == 32;
+    }
+
+    /** Remove blocos iniciais de linhas comentário ({@code #}) — ex.: massa de testes / export com cabeçalho. */
+    private static byte[] removerLinhasIniciaisMetadadoHash(byte[] raw) {
+        int start = 0;
+        while (start < raw.length) {
+            int lineEnd = start;
+            while (lineEnd < raw.length && raw[lineEnd] != '\n' && raw[lineEnd] != '\r') {
+                lineEnd++;
+            }
+            int a = start;
+            while (a < lineEnd && isAsciiWs(raw[a])) {
+                a++;
+            }
+            int b = lineEnd;
+            while (b > a && isAsciiWs(raw[b - 1])) {
+                b--;
+            }
+            if (a >= b) {
+                start = lineEnd;
+                while (start < raw.length && (raw[start] == '\n' || raw[start] == '\r')) {
+                    start++;
+                }
+                continue;
+            }
+            if (raw[a] == '#') {
+                start = lineEnd;
+                while (start < raw.length && (raw[start] == '\n' || raw[start] == '\r')) {
+                    start++;
+                }
+                continue;
+            }
+            break;
+        }
+        return start > 0 ? Arrays.copyOfRange(raw, start, raw.length) : raw;
+    }
+
+    private static int indexOfBytes(byte[] haystack, byte[] needle) {
+        if (needle.length == 0 || haystack.length < needle.length) {
+            return needle.length == 0 ? 0 : -1;
+        }
+        outer:
+        for (int i = 0; i <= haystack.length - needle.length; i++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private static int indexOfByte(byte[] haystack, byte needle) {
+        for (int i = 0; i < haystack.length; i++) {
+            if (haystack[i] == needle) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static byte[] trimLeadingAsciiWs(byte[] raw) {
+        int i = 0;
+        while (i < raw.length && isAsciiWs(raw[i])) {
+            i++;
+        }
+        return i > 0 ? Arrays.copyOfRange(raw, i, raw.length) : raw;
+    }
+
+    private static byte[] cortarAtePrimeiroMarcadorXml(byte[] raw) {
+        raw = trimLeadingAsciiWs(raw);
+        if (raw.length == 0) {
+            return raw;
+        }
+        if (raw[0] == '<') {
+            return raw;
+        }
+        int p = indexOfBytes(raw, "<?xml".getBytes(StandardCharsets.US_ASCII));
+        if (p < 0) {
+            p = indexOfBytes(raw, "<?XML".getBytes(StandardCharsets.US_ASCII));
+        }
+        if (p >= 0) {
+            return Arrays.copyOfRange(raw, p, raw.length);
+        }
+        p = indexOfByte(raw, (byte) '<');
+        if (p > 0) {
+            return Arrays.copyOfRange(raw, p, raw.length);
+        }
+        return raw;
+    }
+
     private void processarXml(DocumentoProcessamento processamento, Path path) throws Exception {
+        byte[] bruto = Files.readAllBytes(path);
+        byte[] xmlBytes = prepararConteudoXmlParaParse(bruto);
+        if (xmlBytes.length == 0) {
+            throw new IllegalArgumentException("Arquivo XML vazio.");
+        }
         DocumentBuilderFactory dbf = criarDbfSeguro();
-        Document doc = dbf.newDocumentBuilder().parse(path.toFile());
+        DocumentBuilder builder = dbf.newDocumentBuilder();
+        Document doc = builder.parse(new InputSource(new ByteArrayInputStream(xmlBytes)));
         doc.getDocumentElement().normalize();
 
         String cnpjEmit = coalesce(firstTagValue(doc, "CNPJ"), firstTagValue(doc, "Cnpj"));
@@ -1001,6 +1177,7 @@ public class DocumentoInteligenciaService {
                 confianca,
                 status == ProcessamentoStatus.PROCESSADO ? "SUCESSO" : "REJEITADO",
                 motivosRevisao,
+                null,
                 null
         ));
         processamento.setObservacaoProcessamento(observacao);
@@ -1056,7 +1233,7 @@ public class DocumentoInteligenciaService {
                 return liquido;
             }
         }
-        if ("NOTA_FISCAL".equals(tipoDocumento)) {
+        if ("NOTA_FISCAL".equals(tipoDocumento) || "NFCE".equals(tipoDocumento)) {
             String totalNota = extrairValorTotalDaNotaFiscal(texto);
             if (!totalNota.isBlank()) {
                 return totalNota;
@@ -1219,6 +1396,709 @@ public class DocumentoInteligenciaService {
         return extrairCnpjAposRotulo(texto, "(tomador|destinatario|cliente)");
     }
 
+    private String extrairCnpjPrincipalGuiaImposto(String texto, String cnpjTomador, String cnpjPrestador) {
+        if (texto == null || texto.isBlank()) {
+            return "";
+        }
+        if (!cnpjTomador.isBlank()) {
+            return cnpjTomador;
+        }
+
+        // Modelo do comprovante IRRF: "CNPJ / CPF" seguido do CNPJ da fonte pagadora.
+        String porRotuloPrincipal = extrairCnpjAposRotulo(texto, "cnpj\\s*/\\s*cpf");
+        if (!porRotuloPrincipal.isBlank()) {
+            return porRotuloPrincipal;
+        }
+
+        // Fallback: evita capturar CNPJ de "Informacoes Complementares" (ex.: convenio medico).
+        String base = texto;
+        Pattern secoesComplementares = Pattern.compile("(?i)\\b7\\.?\\s*informa[cç][oõ]es\\s+complementares\\b");
+        Matcher mSecao = secoesComplementares.matcher(texto);
+        if (mSecao.find()) {
+            base = texto.substring(0, mSecao.start());
+        }
+        String porTrechoPrincipal = extrairCnpj(base);
+        if (!porTrechoPrincipal.isBlank()) {
+            return porTrechoPrincipal;
+        }
+
+        if (!cnpjPrestador.isBlank()) {
+            return cnpjPrestador;
+        }
+        return extrairCnpj(texto);
+    }
+
+    private static String normalizarQuebras(String texto) {
+        if (texto == null) {
+            return "";
+        }
+        return texto.replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private static String extrairBloco(String texto, String regexInicio, String regexFim) {
+        String base = normalizarQuebras(texto);
+        Pattern p = Pattern.compile("(?is)" + regexInicio + "\\s*(.*?)\\s*(?=" + regexFim + "|$)");
+        Matcher m = p.matcher(base);
+        if (!m.find()) {
+            return "";
+        }
+        return m.group(1).trim();
+    }
+
+    private static Map<String, Object> campoDetalhe(String nome, String valor, String tipo) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("nome", nome);
+        item.put("valor", valor == null ? "" : valor.trim());
+        item.put("tipo", tipo);
+        return item;
+    }
+
+    private static void addCampoDetalhe(List<Map<String, Object>> out, String nome, String valor, String tipo) {
+        if (valor == null || valor.isBlank()) {
+            return;
+        }
+        out.add(campoDetalhe(nome, valor, tipo));
+    }
+
+    private static Map<String, Object> secaoDetalhe(String id, String titulo, List<Map<String, Object>> campos) {
+        Map<String, Object> sec = new LinkedHashMap<>();
+        sec.put("id", id);
+        sec.put("titulo", titulo);
+        sec.put("campos", campos);
+        return sec;
+    }
+
+    private static List<Map<String, Object>> ordenarCamposResponsavelInformacoes(List<Map<String, Object>> campos) {
+        if (campos == null || campos.isEmpty()) {
+            return campos;
+        }
+        Map<String, Integer> ordem = Map.of(
+                "nome", 0,
+                "data", 1,
+                "assinatura", 2
+        );
+        List<Map<String, Object>> ordenados = new ArrayList<>(campos);
+        ordenados.sort((a, b) -> {
+            String nomeA = String.valueOf(a.getOrDefault("nome", "")).trim().toLowerCase(Locale.ROOT);
+            String nomeB = String.valueOf(b.getOrDefault("nome", "")).trim().toLowerCase(Locale.ROOT);
+            int ordemA = ordem.getOrDefault(nomeA, 99);
+            int ordemB = ordem.getOrDefault(nomeB, 99);
+            if (ordemA != ordemB) {
+                return Integer.compare(ordemA, ordemB);
+            }
+            return nomeA.compareTo(nomeB);
+        });
+        return ordenados;
+    }
+
+    private static List<Map<String, Object>> parseItensNumeradosComValoresMoeda(String bloco) {
+        List<Map<String, Object>> itens = new ArrayList<>();
+        if (bloco == null || bloco.isBlank()) {
+            return itens;
+        }
+        String base = normalizarQuebras(bloco);
+        Pattern moedaPattern = Pattern.compile("(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\b");
+        Matcher itemMatcher = Pattern.compile("(?ms)^\\s*(\\d{2})\\.\\s*([\\p{L}].+?)(?=^\\s*\\d{2}\\.\\s*[\\p{L}]|\\z)").matcher(base);
+        while (itemMatcher.find()) {
+            String numero = itemMatcher.group(1).trim();
+            String conteudo = itemMatcher.group(2).trim();
+            if (conteudo.isBlank()) {
+                continue;
+            }
+            String valor = "";
+            Matcher valoresNoItem = moedaPattern.matcher(conteudo);
+            while (valoresNoItem.find()) {
+                valor = normalizarValorMonetarioBr(valoresNoItem.group(1));
+            }
+            // Remove monetary values absorbed into the description (two-column PDF layout artifact)
+            String descricao = moedaPattern.matcher(conteudo).replaceAll("").replaceAll("\\s+", " ").trim();
+            String nome = numero + ". " + descricao;
+            itens.add(campoDetalhe(nome, valor, "MOEDA"));
+        }
+        // PDFs com layout de duas colunas colocam todas as descrições primeiro e os valores depois como bloco.
+        // Padrão: o último item absorve todos os valores (trailing block); os demais ficam sem valor.
+        // Quando isso ocorre, coleta os valores do bloco em ordem e redistribui um para cada item.
+        if (itens.size() > 1) {
+            long semValorPrimeiros = itens.stream().limit(itens.size() - 1)
+                    .filter(i -> String.valueOf(i.getOrDefault("valor", "")).isBlank()).count();
+            String valorUltimo = String.valueOf(itens.get(itens.size() - 1).getOrDefault("valor", "")).trim();
+            if (semValorPrimeiros == itens.size() - 1 && !valorUltimo.isBlank()) {
+                List<String> todosValores = new ArrayList<>();
+                Matcher mTodos = moedaPattern.matcher(base);
+                while (mTodos.find()) {
+                    todosValores.add(normalizarValorMonetarioBr(mTodos.group(1)));
+                }
+                if (todosValores.size() == itens.size()) {
+                    for (int i = 0; i < itens.size(); i++) {
+                        itens.get(i).put("valor", todosValores.get(i));
+                    }
+                }
+            }
+        }
+        return itens;
+    }
+
+    private static String toTitleCase(String texto) {
+        if (texto == null || texto.isBlank()) return "";
+        String[] palavras = texto.toLowerCase(Locale.ROOT).split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String p : palavras) {
+            if (!p.isEmpty()) {
+                sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1)).append(" ");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    private static String normalizarNomeCampoLivre(String texto) {
+        if (texto == null || texto.isBlank()) {
+            return "";
+        }
+        String t = texto.toLowerCase(Locale.ROOT);
+        t = t.replaceAll("[áàâãä]", "a");
+        t = t.replaceAll("[éèêë]", "e");
+        t = t.replaceAll("[íìîï]", "i");
+        t = t.replaceAll("[óòôõö]", "o");
+        t = t.replaceAll("[úùûü]", "u");
+        t = t.replaceAll("[ç]", "c");
+        t = t.replaceAll("[^a-z0-9]+", " ").trim();
+        return t;
+    }
+
+    private static String extrairNumeroItem(String nomeCampo) {
+        if (nomeCampo == null || nomeCampo.isBlank()) {
+            return "";
+        }
+        Matcher m = Pattern.compile("^\\s*(\\d{2})\\b").matcher(nomeCampo);
+        if (!m.find()) {
+            return "";
+        }
+        return m.group(1);
+    }
+
+    private static void preencherCamposCanonicosIrpfSecao3(
+            List<Map<String, Object>> itensSecao3,
+            Map<String, String> camposBase
+    ) {
+        if (itensSecao3 == null || itensSecao3.isEmpty() || camposBase == null) {
+            return;
+        }
+        for (Map<String, Object> item : itensSecao3) {
+            String nome = String.valueOf(item.getOrDefault("nome", ""));
+            String valor = String.valueOf(item.getOrDefault("valor", "")).trim();
+            if (valor.isBlank()) {
+                continue;
+            }
+            String numero = extrairNumeroItem(nome);
+            String nomeNorm = normalizarNomeCampoLivre(nome);
+            if ("01".equals(numero) || nomeNorm.contains("total dos rendimentos")) {
+                camposBase.put("totalDosRendimentosInclusiveFerias", valor);
+                continue;
+            }
+            if ("02".equals(numero) || nomeNorm.contains("contribuicao previdenciaria oficial")) {
+                camposBase.put("contribuicaoPrevidenciariaOficial", valor);
+                continue;
+            }
+            if ("03".equals(numero) || nomeNorm.contains("fapi")) {
+                camposBase.put("contribuicaoEntidadesPrevidenciaComplementarPublicaOuPrivadaEFapi", valor);
+                continue;
+            }
+            if ("04".equals(numero) || nomeNorm.contains("pensao alimenticia")) {
+                camposBase.put("pensaoAlimenticia", valor);
+                continue;
+            }
+            if ("05".equals(numero) || nomeNorm.contains("imposto sobre a renda retido na fonte")) {
+                camposBase.put("impostoSobreARendaRetidoNaFonte", valor);
+            }
+        }
+    }
+
+    private static void preencherCamposCanonicosItensSecao(
+            String prefixoCampo,
+            List<Map<String, Object>> itens,
+            Map<String, String> camposBase
+    ) {
+        if (prefixoCampo == null || prefixoCampo.isBlank() || itens == null || itens.isEmpty() || camposBase == null) {
+            return;
+        }
+        for (Map<String, Object> item : itens) {
+            String nome = String.valueOf(item.getOrDefault("nome", ""));
+            String valor = String.valueOf(item.getOrDefault("valor", "")).trim();
+            String numero = extrairNumeroItem(nome);
+            if (numero.isBlank()) {
+                continue;
+            }
+            camposBase.put(prefixoCampo + "Item" + numero, valor);
+        }
+    }
+
+    private static boolean guiaIrpfSecao3Completa(Map<String, String> camposBase) {
+        if (camposBase == null) {
+            return false;
+        }
+        return !camposBase.getOrDefault("totalDosRendimentosInclusiveFerias", "").isBlank()
+                && !camposBase.getOrDefault("contribuicaoPrevidenciariaOficial", "").isBlank()
+                && !camposBase.getOrDefault("contribuicaoEntidadesPrevidenciaComplementarPublicaOuPrivadaEFapi", "").isBlank()
+                && !camposBase.getOrDefault("pensaoAlimenticia", "").isBlank()
+                && !camposBase.getOrDefault("impostoSobreARendaRetidoNaFonte", "").isBlank();
+    }
+
+    private static boolean guiaIrpfTopicosCompletos(Map<String, String> camposBase) {
+        if (camposBase == null) {
+            return false;
+        }
+        if (!guiaIrpfSecao3Completa(camposBase)) {
+            return false;
+        }
+        boolean secao1Ok = !camposBase.getOrDefault("nomeFontePagadora", "").isBlank()
+                && !camposBase.getOrDefault("cnpjCpfFontePagadora", "").isBlank();
+        boolean secao2Ok = !camposBase.getOrDefault("nomeBeneficiario", "").isBlank()
+                && !camposBase.getOrDefault("cpfBeneficiario", "").isBlank()
+                && !camposBase.getOrDefault("naturezaRendimento", "").isBlank();
+        boolean secao7Ok = !camposBase.getOrDefault("informacoesComplementaresTexto", "").isBlank();
+        boolean secao8NomeOk = !camposBase.getOrDefault("nomeResponsavelInformacoes", "").isBlank()
+                || !camposBase.getOrDefault("Nome", "").isBlank();
+        boolean secao8Ok = !camposBase.getOrDefault("dataResponsavelInformacoes", "").isBlank() && secao8NomeOk;
+        return secao1Ok && secao2Ok && secao7Ok && secao8Ok;
+    }
+
+    private static String motivoGuiaIrpfIncompleta(Map<String, String> camposBase) {
+        if (guiaIrpfTopicosCompletos(camposBase)) {
+            return "";
+        }
+        boolean faltouNomeResponsavel = camposBase == null
+                || (camposBase.getOrDefault("nomeResponsavelInformacoes", "").isBlank()
+                && camposBase.getOrDefault("Nome", "").isBlank());
+        boolean faltouApenasNomeResponsavel = faltouNomeResponsavel
+                && camposBase != null
+                && !camposBase.getOrDefault("dataResponsavelInformacoes", "").isBlank()
+                && !camposBase.getOrDefault("nomeFontePagadora", "").isBlank()
+                && !camposBase.getOrDefault("cnpjCpfFontePagadora", "").isBlank()
+                && !camposBase.getOrDefault("nomeBeneficiario", "").isBlank()
+                && !camposBase.getOrDefault("cpfBeneficiario", "").isBlank()
+                && !camposBase.getOrDefault("naturezaRendimento", "").isBlank()
+                && !camposBase.getOrDefault("informacoesComplementaresTexto", "").isBlank()
+                && guiaIrpfSecao3Completa(camposBase);
+        if (faltouApenasNomeResponsavel) {
+            return "Seção 8: campo Nome (conforme PDF) não identificado no documento.";
+        }
+        return "Guia IRPF com campos incompletos para preenchimento automático seguro (tópicos 1-8).";
+    }
+
+    /**
+     * Extrai valores monetários que aparecem logo após o cabeçalho {@code regexHeader} e antes do
+     * primeiro item numerado {@code \d{2}\.} da seção seguinte — padrão do PDFBox para documentos
+     * IRPF com layout de duas colunas.
+     */
+    private static List<String> extrairValoresEntreHeaderEPrimeiroItemIrpf(String base, String regexHeader) {
+        Pattern pHeader = Pattern.compile("(?i)" + regexHeader);
+        Matcher mHeader = pHeader.matcher(base);
+        if (!mHeader.find()) {
+            return List.of();
+        }
+        int posAposHeader = mHeader.end();
+        // \d{2}\. seguido de espaço e letra (ex.: "01. Parcela") — evita match em valores como "26.162,49"
+        Matcher mPrimeiroItem = Pattern.compile("(?m)^\\s*\\d{2}\\.\\s*[\\p{L}]").matcher(base);
+        mPrimeiroItem.region(posAposHeader, base.length());
+        int fimRegiao = mPrimeiroItem.find() ? mPrimeiroItem.start() : base.length();
+        String regiao = base.substring(posAposHeader, fimRegiao);
+        Pattern moeda = Pattern.compile("(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\b");
+        List<String> valores = new ArrayList<>();
+        Matcher mV = moeda.matcher(regiao);
+        while (mV.find()) {
+            valores.add(normalizarValorMonetarioBr(mV.group(1)));
+        }
+        return valores;
+    }
+
+    /**
+     * Remove os primeiros {@code n} valores monetários de um bloco de texto — usado para descartar
+     * valores da seção 3 que o PDFBox inclui incorretamente no início do bloco da seção 4.
+     */
+    private static String removerValoresIniciais(String bloco, int n) {
+        if (n <= 0 || bloco == null || bloco.isBlank()) {
+            return bloco == null ? "" : bloco;
+        }
+        Pattern moeda = Pattern.compile("(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\b");
+        Matcher m = moeda.matcher(bloco);
+        int count = 0;
+        int ultimoFim = 0;
+        while (m.find() && count < n) {
+            ultimoFim = m.end();
+            count++;
+        }
+        if (count < n) {
+            return bloco;
+        }
+        return bloco.substring(ultimoFim).stripLeading();
+    }
+
+    /**
+     * Extrator dedicado para a seção 5 do IRPF. O PDFBox coloca alguns valores antes das descrições
+     * dos itens e mistura itens/valores com a seção 6 por causa do layout de colunas do PDF.
+     * Estratégia: extrai os valores posicionalmente e os mapeia pelas labels conhecidas.
+     */
+    private static List<Map<String, Object>> extrairItensSecao5Irpf(String base) {
+        Pattern moeda = Pattern.compile("(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\b");
+        String regexSec5 = "5\\.\\s*Rendimentos\\s*Sujeitos\\s+[àa]\\s*Tributa[cç][aã]o\\s+Exclusiva\\s*\\(Rendimento\\s+L[ií]quido\\)";
+        String regexSec6 = "6\\.\\s*Rendimentos\\s+Recebidos\\s+Acumuladamente";
+
+        Matcher mSec5 = Pattern.compile("(?i)" + regexSec5).matcher(base);
+        if (!mSec5.find()) {
+            return List.of();
+        }
+        int posSec5 = mSec5.end();
+        Matcher mSec6 = Pattern.compile("(?i)" + regexSec6).matcher(base);
+        int posSec6 = mSec6.find(posSec5) ? mSec6.start() : base.length();
+        Matcher mSec7 = Pattern.compile("(?i)7\\.\\s*Informa[cç][oõ]es\\s+Complementares").matcher(base);
+        int posSec7 = mSec7.find(posSec6) ? mSec7.start() : base.length();
+
+        // Valores que o PDFBox coloca antes dos itens numerados dentro do bloco da seção 5.
+        // Os itens da seção 5 são sempre 01, 02, 03 (com zero à esquerda).
+        // Usamos "0\d\." para não confundir com valores monetários como "30.109,97".
+        Matcher mPrimeiroItem5 = Pattern.compile("(?m)^\\s*0\\d\\.\\s*").matcher(base);
+        mPrimeiroItem5.region(posSec5, posSec6);
+        int posItens5 = mPrimeiroItem5.find() ? mPrimeiroItem5.start() : posSec6;
+        List<String> valoresPreItens = new ArrayList<>();
+        Matcher mVPre = moeda.matcher(base.substring(posSec5, posItens5));
+        while (mVPre.find()) {
+            valoresPreItens.add(normalizarValorMonetarioBr(mVPre.group(1)));
+        }
+
+        // Itens numerados que aparecem no bloco da seção 5 (podem ser apenas 01 e 02).
+        String blocoSec5Items = base.substring(posItens5, posSec6);
+        List<String> labelsOrdem = new ArrayList<>();
+        Matcher mItems = Pattern.compile("(?ms)^\\s*(0\\d)\\.\\s*(.+?)(?=^\\s*0\\d\\.\\s*|\\z)").matcher(blocoSec5Items);
+        Map<String, String> labelPorNumero = new LinkedHashMap<>();
+        while (mItems.find()) {
+            String num = mItems.group(1).trim();
+            String label = moeda.matcher(mItems.group(2)).replaceAll("").replaceAll("\\s+", " ").trim();
+            labelPorNumero.put(num, label);
+            labelsOrdem.add(num);
+        }
+
+        // Itens numerados que aparecem no bloco da seção 6 mas pertencem à seção 5 (item 03, etc.)
+        // O PDFBox coloca o item 03 (Outros/PLR) e seu valor na região da seção 6.
+        // O valor do item 02 (IRRF sobre 13º) aparece adjacente ao item 03 no bloco da seção 6.
+        String blocoSec6 = base.substring(posSec6, posSec7);
+        Matcher mItems6 = Pattern.compile("(?ms)^\\s*(0\\d)\\.\\s*(.+?)(?=^\\s*0\\d\\.\\s*|\\z)").matcher(blocoSec6);
+        Map<String, String> valoresSec6PorNumero = new LinkedHashMap<>();
+        while (mItems6.find()) {
+            String num = mItems6.group(1).trim();
+            String label = moeda.matcher(mItems6.group(2)).replaceAll("").replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
+            String numNorm = normalizarNomeCampoLivre(label);
+            if (!labelPorNumero.containsKey(num) && (numNorm.contains("outros") || numNorm.contains("plr"))) {
+                labelPorNumero.put(num, label);
+                labelsOrdem.add(num);
+                // O valor do item 02 aparece logo após o item 03 no bloco da seção 6.
+                Matcher mValSec6 = moeda.matcher(mItems6.group(2));
+                if (mValSec6.find()) {
+                    valoresSec6PorNumero.put(num, normalizarValorMonetarioBr(mValSec6.group(1)));
+                } else {
+                    int posAposItem = posSec6 + mItems6.end();
+                    Matcher mVApos = moeda.matcher(base.substring(posAposItem, Math.min(posAposItem + 200, posSec7)));
+                    if (mVApos.find()) {
+                        valoresSec6PorNumero.put(num, normalizarValorMonetarioBr(mVApos.group(1)));
+                    }
+                }
+            }
+        }
+
+        // Layout PDFBox para seção 5 do IRPF (duas colunas):
+        //   valoresPreItens[0] → item 01 (13º salário)
+        //   valoresPreItens[1] → item 03 (Outros/PLR)
+        //   valoresSec6["03"]  → item 02 (IRRF sobre 13º) — valor aparece após "03. Outros" no bloco sec6
+        // O item 02 não tem valor pré-item; seu valor fica na região da seção 6 junto ao item 03.
+        List<String> numerosOrdenados = labelsOrdem.stream().distinct().sorted().toList();
+        // Atribui valoresPreItens aos itens em ordem, pulando o item "02".
+        List<String> numerosParaPreItens = numerosOrdenados.stream()
+                .filter(n -> !n.equals("02")).toList();
+        Map<String, String> valorPorNumero = new LinkedHashMap<>();
+        for (int i = 0; i < numerosParaPreItens.size() && i < valoresPreItens.size(); i++) {
+            valorPorNumero.put(numerosParaPreItens.get(i), valoresPreItens.get(i));
+        }
+        if (valoresSec6PorNumero.containsKey("03") && labelPorNumero.containsKey("02")) {
+            valorPorNumero.put("02", valoresSec6PorNumero.get("03"));
+        }
+        List<Map<String, Object>> itens = new ArrayList<>();
+        for (String num : numerosOrdenados) {
+            String label = labelPorNumero.getOrDefault(num, "");
+            String valor = valorPorNumero.getOrDefault(num, "");
+            itens.add(campoDetalhe(num + ". " + label, valor, "MOEDA"));
+        }
+        return itens;
+    }
+
+    private Map<String, Object> extrairDetalhamentoGuiaImpostoIrpf(String texto, Map<String, String> camposBase) {
+        String base = normalizarQuebras(texto);
+        if (base.isBlank()) {
+            return null;
+        }
+        List<Map<String, Object>> secoes = new ArrayList<>();
+
+        List<Map<String, Object>> secao1 = new ArrayList<>();
+        String nomeFonte = "";
+        Matcher mNomeFonte = Pattern.compile("(?is)\\n([^\\n]+?)\\n\\s*Nome\\s+Empresarial\\s*/\\s*Nome\\s+Completo\\b").matcher(base);
+        if (mNomeFonte.find()) {
+            nomeFonte = mNomeFonte.group(1).trim();
+        }
+        addCampoDetalhe(secao1, "Nome Empresarial / Nome Completo", nomeFonte, "TEXTO");
+        addCampoDetalhe(secao1, "CNPJ / CPF", camposBase.getOrDefault("cnpj", ""), "CNPJ");
+        camposBase.put("nomeFontePagadora", safe(nomeFonte));
+        camposBase.put("cnpjCpfFontePagadora", safe(camposBase.getOrDefault("cnpj", "")));
+        secoes.add(secaoDetalhe("secao1", "1. Fonte Pagadora Pessoa Jurídica ou Pessoa Física", secao1));
+
+        List<Map<String, Object>> secao2 = new ArrayList<>();
+        String nomeBeneficiario = "";
+        Matcher mNomeBen = Pattern.compile("(?is)2\\.\\s*Pessoa\\s+F[ií]sica\\s+Benefici[aá]ria\\s+dos\\s+Rendimentos\\s*(.*?)\\s*Nome\\s+Completo").matcher(base);
+        if (mNomeBen.find()) {
+            nomeBeneficiario = mNomeBen.group(1).trim();
+        }
+        String cpfBenef = "";
+        Matcher mCpfBen = Pattern.compile("(?is)Nome\\s+Completo\\s*(\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2})\\s*CPF").matcher(base);
+        if (mCpfBen.find()) {
+            cpfBenef = mCpfBen.group(1).replaceAll("\\D", "");
+        }
+        String natureza = "";
+        Matcher mNatureza = Pattern.compile("(?im)^\\s*\\d{4}\\s*-\\s*.+$").matcher(base);
+        if (mNatureza.find()) {
+            natureza = mNatureza.group().trim();
+        }
+        addCampoDetalhe(secao2, "Nome Completo", nomeBeneficiario, "TEXTO");
+        addCampoDetalhe(secao2, "CPF", cpfBenef, "CPF");
+        addCampoDetalhe(secao2, "Natureza do Rendimento", natureza, "TEXTO");
+        camposBase.put("nomeBeneficiario", safe(primeiroNaoVazio(
+                nomeBeneficiario,
+                camposBase.get("nomeBeneficiario"),
+                camposBase.get("Nome Completo")
+        )));
+        camposBase.put("cpfBeneficiario", safe(primeiroNaoVazio(cpfBenef, camposBase.get("cpfBeneficiario"), camposBase.get("CPF"))));
+        camposBase.put("naturezaRendimento", safe(primeiroNaoVazio(natureza, camposBase.get("naturezaRendimento"), camposBase.get("Natureza do Rendimento"))));
+        secoes.add(secaoDetalhe("secao2", "2. Pessoa Física Beneficiária dos Rendimentos", secao2));
+
+        // Seção 3: labels estão no bloco3, mas o PDFBox coloca os valores logo após o cabeçalho da seção 4.
+        String bloco3 = extrairBloco(base,
+                "3\\.\\s*Rendimentos\\s+Tribut[aá]veis,\\s*Dedu[cç][oõ]es\\s+e\\s+Imposto\\s+sobre\\s+a\\s+Renda\\s+Retido\\s+na\\s+Fonte\\s*\\(IRRF\\)",
+                "4\\.\\s*Rendimentos\\s+Isentos\\s+e\\s+N[aã]o\\s+Tribut[aá]veis");
+        List<Map<String, Object>> itensSecao3 = parseItensNumeradosComValoresMoeda(bloco3);
+        if (!itensSecao3.isEmpty()) {
+            // Busca os valores da seção 3 na região entre o cabeçalho da seção 4 e o primeiro item "01." dela.
+            List<String> valoresSec3 = extrairValoresEntreHeaderEPrimeiroItemIrpf(base,
+                    "4\\.\\s*Rendimentos\\s+Isentos\\s+e\\s+N[aã]o\\s+Tribut[aá]veis");
+            if (valoresSec3.size() == itensSecao3.size()) {
+                for (int i = 0; i < itensSecao3.size(); i++) {
+                    itensSecao3.get(i).put("valor", valoresSec3.get(i));
+                }
+            }
+        }
+        preencherCamposCanonicosIrpfSecao3(itensSecao3, camposBase);
+        secoes.add(secaoDetalhe("secao3",
+                "3. Rendimentos Tributáveis, Deduções e Imposto sobre a Renda Retido na Fonte (IRRF)",
+                itensSecao3));
+
+        String bloco4 = extrairBloco(base,
+                "4\\.\\s*Rendimentos\\s+Isentos\\s+e\\s+N[aã]o\\s+Tribut[aá]veis",
+                "5\\.\\s*Rendimentos\\s*Sujeitos\\s+[àa]\\s*Tributa[cç][aã]o\\s+Exclusiva");
+        // Remove valores que pertencem à seção 3 (aparecem no início do bloco4 por causa do layout PDF).
+        String bloco4SemValoresSec3 = removerValoresIniciais(bloco4, itensSecao3.size());
+        List<Map<String, Object>> itensSecao4 = parseItensNumeradosComValoresMoeda(bloco4SemValoresSec3);
+        preencherCamposCanonicosItensSecao("secao4RendimentosIsentos", itensSecao4, camposBase);
+        secoes.add(secaoDetalhe("secao4", "4. Rendimentos Isentos e Não Tributáveis", itensSecao4));
+
+        // Seção 5: o PDFBox coloca alguns valores antes das descrições dos itens; usa extrator dedicado.
+        List<Map<String, Object>> itensSecao5 = extrairItensSecao5Irpf(base);
+        preencherCamposCanonicosItensSecao("secao5TributacaoExclusiva", itensSecao5, camposBase);
+        secoes.add(secaoDetalhe("secao5",
+                "5. Rendimentos Sujeitos à Tributação Exclusiva (Rendimento Líquido)",
+                itensSecao5));
+
+        String bloco6 = extrairBloco(base,
+                "6\\.\\s*Rendimentos\\s+Recebidos\\s+Acumuladamente\\s+Art\\.\\s*12-A\\s+da\\s+Lei\\s+n[ºo]\\s*7\\.713,\\s*de\\s*1988\\s*\\(sujeitos\\s+[àa]\\s*tributa[cç][aã]o\\s+exclusiva\\)",
+                "7\\.\\s*Informa[cç][oõ]es\\s+Complementares");
+        List<Map<String, Object>> itensSecao6 = parseItensNumeradosComValoresMoeda(bloco6);
+        preencherCamposCanonicosItensSecao("secao6RendimentosAcumulados", itensSecao6, camposBase);
+        secoes.add(secaoDetalhe("secao6",
+                "6. Rendimentos Recebidos Acumuladamente Art. 12-A da Lei nº 7.713, de 1988 (sujeitos à tributação exclusiva)",
+                itensSecao6));
+
+        String bloco7 = extrairBloco(base,
+                "7\\.\\s*Informa[cç][oõ]es\\s+Complementares",
+                "8\\.\\s*Respons[aá]vel\\s+pelas\\s+Informa[cç][oõ]es");
+        List<Map<String, Object>> secao7 = new ArrayList<>();
+        addCampoDetalhe(secao7, "Texto", bloco7, "TEXTO_LONGO");
+        camposBase.put("informacoesComplementaresTexto", safe(bloco7));
+        secoes.add(secaoDetalhe("secao7", "7. Informações Complementares", secao7));
+
+        String bloco8 = extrairBloco(base,
+                "8\\.\\s*Respons[aá]vel\\s+pelas\\s+Informa[cç][oõ]es",
+                "P[aá]gina\\s+\\d+\\s+de\\s+\\d+");
+        List<Map<String, Object>> secao8 = new ArrayList<>();
+        String nomeResponsavel = extrairNomeResponsavelBloco8(bloco8);
+        if (nomeResponsavel.isBlank()) {
+            nomeResponsavel = fallbackNomeResponsavel(camposBase);
+        }
+        addCampoDetalhe(secao8, "Nome", nomeResponsavel, "TEXTO");
+        Matcher mData = Pattern.compile("\\b\\d{2}/\\d{2}/\\d{4}\\b").matcher(bloco8);
+        String dataResponsavel = mData.find() ? normalizarData(mData.group()) : "";
+        addCampoDetalhe(secao8, "Data", dataResponsavel, "DATA");
+        boolean dispensaAssinatura = bloco8.toLowerCase(Locale.ROOT).contains("dispensa");
+        addCampoDetalhe(secao8, "Assinatura", dispensaAssinatura ? "Dispensada (SRF 149/98)" : "Não obrigatório", "TEXTO");
+        camposBase.put("dataResponsavelInformacoes", safe(dataResponsavel));
+        camposBase.put("nomeResponsavelInformacoes", safe(nomeResponsavel));
+        if (!nomeResponsavel.isBlank()) {
+            camposBase.put("Nome", safe(nomeResponsavel));
+        }
+        secoes.add(secaoDetalhe("secao8", "8. Responsável pelas Informações", ordenarCamposResponsavelInformacoes(secao8)));
+
+        Map<String, Object> det = new LinkedHashMap<>();
+        det.put("tipoEstrutura", "GUIA_IMPOSTO_IRPF");
+        det.put("secoes", secoes);
+        return det;
+    }
+
+    private static String extrairNomeResponsavelBloco8(String bloco8) {
+        if (bloco8 == null || bloco8.isBlank()) {
+            return "";
+        }
+        // 0) Layout do PDF: rótulo "Nome" sozinho na linha e valor na linha seguinte.
+        String porRotulo = extrairNomeAposRotuloNomeEmLinhaIsolada(bloco8);
+        if (!porRotulo.isBlank()) {
+            return porRotulo;
+        }
+        // 1) Layout clássico: "Nome DATA Assinatura" seguido da linha de valores.
+        Matcher mCabecalho = Pattern.compile("(?i)Nome[^\\n]*DATA[^\\n]*\\n([^\\n]+)").matcher(bloco8);
+        if (mCabecalho.find()) {
+            String linhaValores = mCabecalho.group(1).trim();
+            String nome = linhaValores.replaceAll("\\s*\\d{2}[/-]\\d{2}[/-]\\d{4}.*", "").trim();
+            if (!nome.isBlank()) {
+                return toTitleCase(nome);
+            }
+        }
+        // 2) Nome e data na mesma linha (sem quebra após cabeçalho).
+        Matcher mNomeDataLinha = Pattern.compile("(?im)^\\s*([\\p{L}][\\p{L}\\s.'-]{4,}?)\\s+\\d{2}[/-]\\d{2}[/-]\\d{4}(?:\\s+.*)?$")
+                .matcher(bloco8);
+        while (mNomeDataLinha.find()) {
+            String candidato = mNomeDataLinha.group(1).trim();
+            if (nomeResponsavelValido(candidato)) {
+                return toTitleCase(candidato);
+            }
+        }
+        // 3) Valor após rótulo "Nome" (mesma linha ou próxima).
+        Matcher mCampoNome = Pattern.compile("(?is)\\bNome\\b\\s*[:\\-]?\\s*(?:\\n\\s*)?([\\p{L}][\\p{L}\\s.'-]{4,})")
+                .matcher(bloco8);
+        if (mCampoNome.find()) {
+            String candidato = mCampoNome.group(1)
+                    .replaceAll("\\s*\\bDATA\\b.*", "")
+                    .replaceAll("\\s*\\d{2}[/-]\\d{2}[/-]\\d{4}.*", "")
+                    .trim();
+            if (nomeResponsavelValido(candidato)) {
+                return toTitleCase(candidato);
+            }
+        }
+        // 4) Fallback: linha isolada de texto com nome plausível.
+        Matcher mFallback = Pattern.compile("(?im)^\\s*([\\p{L}][\\p{L}\\s.'-]{6,})\\s*$").matcher(bloco8);
+        while (mFallback.find()) {
+            String candidato = mFallback.group(1).trim();
+            if (nomeResponsavelValido(candidato)) {
+                return toTitleCase(candidato);
+            }
+        }
+        // 5) Trecho antes da primeira data dd/mm/aaaa: linha com 2+ palavras (nome composto).
+        Matcher mPrimeiraData = Pattern.compile("\\d{2}/\\d{2}/\\d{4}").matcher(bloco8);
+        int cut = mPrimeiraData.find() ? mPrimeiraData.start() : bloco8.length();
+        String trecho = bloco8.substring(0, cut);
+        for (String linha : trecho.split("\\R")) {
+            String t = linha.trim();
+            if (t.isEmpty()) {
+                continue;
+            }
+            String lc = t.toLowerCase(Locale.ROOT);
+            if (lc.matches("(?i)nome|data|assinatura") || lc.startsWith("8.")) {
+                continue;
+            }
+            if (lc.contains("dispensa") || lc.contains("chancela") || lc.contains("srf")) {
+                continue;
+            }
+            if (t.split("\\s+").length >= 2 && nomeResponsavelValido(t)) {
+                return toTitleCase(t);
+            }
+        }
+        return "";
+    }
+
+    /**
+     * PDF costuma trazer o quadro da seção 8 como "Nome" em uma linha e o valor na seguinte.
+     */
+    private static String extrairNomeAposRotuloNomeEmLinhaIsolada(String bloco8) {
+        String[] linhas = normalizarQuebras(bloco8).split("\\R");
+        for (int i = 0; i < linhas.length - 1; i++) {
+            String rotulo = linhas[i].trim();
+            if (!rotulo.equalsIgnoreCase("nome")) {
+                continue;
+            }
+            for (int j = i + 1; j < linhas.length; j++) {
+                String candidato = linhas[j].trim();
+                if (candidato.isEmpty()) {
+                    continue;
+                }
+                String lc = candidato.toLowerCase(Locale.ROOT);
+                if (lc.equals("data") || lc.equals("assinatura") || lc.matches("\\d{2}[/-]\\d{2}[/-]\\d{4}.*")) {
+                    break;
+                }
+                if (nomeResponsavelValido(candidato)) {
+                    return toTitleCase(candidato);
+                }
+                break;
+            }
+        }
+        return "";
+    }
+
+    private static boolean nomeResponsavelValido(String candidato) {
+        if (candidato == null || candidato.isBlank()) {
+            return false;
+        }
+        String lc = candidato.toLowerCase(Locale.ROOT);
+        return !lc.contains("data")
+                && !lc.contains("nome")
+                && !lc.contains("assinatura")
+                && !lc.contains("dispensa")
+                && !lc.contains("chancela")
+                && !lc.contains("responsavel")
+                && !lc.contains("responsável")
+                && !lc.contains("inform");
+    }
+
+    private static String fallbackNomeResponsavel(Map<String, String> camposBase) {
+        if (camposBase == null || camposBase.isEmpty()) {
+            return "";
+        }
+        String[] candidatos = new String[] {
+                camposBase.getOrDefault("nomeResponsavelInformacoes", ""),
+                camposBase.getOrDefault("Nome", ""),
+                camposBase.getOrDefault("nomeResponsavel", "")
+        };
+        for (String c : candidatos) {
+            String nome = c == null ? "" : c.trim();
+            if (!nome.isBlank() && nomeResponsavelValido(nome)) {
+                return toTitleCase(nome);
+            }
+        }
+        return "";
+    }
+
+    private static String primeiroNaoVazio(String... valores) {
+        if (valores == null || valores.length == 0) {
+            return "";
+        }
+        for (String v : valores) {
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
+        }
+        return "";
+    }
+
     private String safe(String value) {
         return value == null ? "" : value.replace("\"", "'");
     }
@@ -1230,7 +2110,8 @@ public class DocumentoInteligenciaService {
             double confianca,
             String status,
             List<String> motivosRevisao,
-            Object detalhamentoDocumento
+            Object detalhamentoDocumento,
+            String capturaPerfil
     ) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("fonte", safe(fonte));
@@ -1246,18 +2127,70 @@ public class DocumentoInteligenciaService {
                     camposParaJson.put(e.getKey(), e.getValue());
                 }
             }
+            if (capturaPerfil != null && capturaPerfil.startsWith("GUIA_IMPOSTO_IRPF")) {
+                mesclarCamposSecoesGuiaIrpf(detalhamentoDocumento, camposParaJson);
+                sincronizarNomeSecao8GuiaIrpf(camposParaJson);
+            }
         }
         payload.put("camposExtraidos", camposParaJson);
         payload.put("motivosRevisao", motivosRevisao);
         if (detalhamentoDocumento != null) {
             payload.put("detalhamentoDocumento", detalhamentoDocumento);
-            payload.put("capturaPerfil", "HOLERITE_ESCRITORIO_COMPLETO");
+        }
+        if (capturaPerfil != null && !capturaPerfil.isBlank()) {
+            payload.put("capturaPerfil", capturaPerfil);
         }
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException ex) {
             return "{\"fonte\":\"" + safe(fonte) + "\",\"tipoDocumento\":\"" + safe(tipoDocumento) + "\"}";
         }
+    }
+
+    private void mesclarCamposSecoesGuiaIrpf(Object detalhamentoDocumento, Map<String, String> camposParaJson) {
+        if (detalhamentoDocumento == null || camposParaJson == null) {
+            return;
+        }
+        try {
+            JsonNode det = objectMapper.valueToTree(detalhamentoDocumento);
+            JsonNode secoes = det.get("secoes");
+            if (secoes == null || !secoes.isArray()) {
+                return;
+            }
+            for (JsonNode secao : secoes) {
+                JsonNode campos = secao.get("campos");
+                if (campos == null || !campos.isArray()) {
+                    continue;
+                }
+                for (JsonNode campo : campos) {
+                    String nome = campo.path("nome").asText("").trim();
+                    String valor = campo.path("valor").asText("").trim();
+                    if (nome.isBlank() || valor.isBlank()) {
+                        continue;
+                    }
+                    camposParaJson.putIfAbsent(nome, valor);
+                }
+            }
+        } catch (Exception ignored) {
+            // Mantém o processamento robusto mesmo se o detalhamento vier fora do formato esperado.
+        }
+    }
+
+    /** Alinha chave canônica interna com o rótulo do PDF ("Nome" na seção 8). */
+    private static void sincronizarNomeSecao8GuiaIrpf(Map<String, String> camposParaJson) {
+        if (camposParaJson == null) {
+            return;
+        }
+        String nome = primeiroNaoVazio(
+                camposParaJson.get("Nome"),
+                camposParaJson.get("nomeResponsavelInformacoes")
+        );
+        if (nome == null || nome.isBlank()) {
+            return;
+        }
+        nome = nome.trim();
+        camposParaJson.put("Nome", nome);
+        camposParaJson.put("nomeResponsavelInformacoes", nome);
     }
 
     private String coalesce(String a, String b) {
@@ -1331,6 +2264,58 @@ public class DocumentoInteligenciaService {
         return matcher.find() ? matcher.group(1) : "";
     }
 
+    private String extrairDataPorRotulo(String texto, String... rotulos) {
+        if (texto == null || texto.isBlank() || rotulos == null || rotulos.length == 0) {
+            return "";
+        }
+        String base = texto;
+        for (String rotulo : rotulos) {
+            if (rotulo == null || rotulo.isBlank()) {
+                continue;
+            }
+            String r = Pattern.quote(rotulo);
+            Pattern rotuloAntesData = Pattern.compile("(?i)\\b" + r + "\\b[^0-9]{0,24}(\\d{2}/\\d{2}/\\d{4}|\\d{4}-\\d{2}-\\d{2})");
+            Matcher mAntes = rotuloAntesData.matcher(base);
+            if (mAntes.find()) {
+                return mAntes.group(1);
+            }
+            Pattern dataAntesRotulo = Pattern.compile("(?i)(\\d{2}/\\d{2}/\\d{4}|\\d{4}-\\d{2}-\\d{2})[^A-Za-z0-9]{0,16}\\b" + r + "\\b");
+            Matcher mDepois = dataAntesRotulo.matcher(base);
+            if (mDepois.find()) {
+                return mDepois.group(1);
+            }
+        }
+        return "";
+    }
+
+    /**
+     * Extrai vencimento apenas quando houver rotulo confiavel para evitar confusao com data de emissao.
+     */
+    private String extrairVencimento(String texto, String tipoDocumento) {
+        String vencimentoRotulado = extrairDataPorRotulo(texto, "vencimento", "vencto", "vcto");
+        if (!vencimentoRotulado.isBlank()) {
+            return vencimentoRotulado;
+        }
+        if (!TipoDocumentoCatalogo.ehGuiaReceitaFederal(tipoDocumento)) {
+            return "";
+        }
+        String base = texto == null ? "" : texto;
+        Matcher matcher = DATA_PATTERN.matcher(base);
+        while (matcher.find()) {
+            String data = matcher.group(1);
+            int ini = Math.max(0, matcher.start() - 48);
+            int fim = Math.min(base.length(), matcher.end() + 16);
+            String contexto = base.substring(ini, fim).toLowerCase(Locale.ROOT);
+            boolean rotuloVencimento = contexto.contains("vencimento") || contexto.contains("vcto");
+            boolean rotuloEmissao = contexto.contains("emissao") || contexto.contains("emissão");
+            if (rotuloVencimento && !rotuloEmissao) {
+                return data;
+            }
+        }
+        // Sem rotulo de vencimento confiavel: melhor nao validar vencimento do que rejeitar por data de emissao.
+        return "";
+    }
+
     private boolean competenciaYmPlausivel(String yyyyMm) {
         if (yyyyMm == null || !yyyyMm.matches("\\d{4}-\\d{2}")) {
             return false;
@@ -1383,6 +2368,31 @@ public class DocumentoInteligenciaService {
 
     private String inferirTributo(String textoBase) {
         String base = textoBase == null ? "" : textoBase.toUpperCase(Locale.ROOT);
+        if (base.contains("IRRF") || base.contains("IMPOSTO SOBRE A RENDA RETIDO NA FONTE")) {
+            return "IRRF";
+        }
+        if (base.contains("IPI") || base.contains("IMPOSTO SOBRE PRODUTOS INDUSTRIALIZADOS")) {
+            return "IPI";
+        }
+        if (base.contains(" IOF") || base.contains("\nIOF") || base.contains("IMPOSTO SOBRE OPERAÇÕES FINANCEIRAS")
+                || base.contains("IMPOSTO SOBRE OPERACOES FINANCEIRAS")) {
+            return "IOF";
+        }
+        if (Pattern.compile("\\bCIDE\\b").matcher(base).find()) {
+            return "CIDE";
+        }
+        if (base.contains("IMPOSTO DE IMPORTA") || base.contains("IMPOSTO DE IMPORTACAO")) {
+            return "II";
+        }
+        if (base.contains("ITR") || base.contains("IMPOSTO TERRITORIAL RURAL")) {
+            return "ITR";
+        }
+        if (base.contains("FUNRURAL") || base.contains("FUNREA")) {
+            return "FUNRURAL";
+        }
+        if (base.contains("DARF") || base.contains("GPS") || base.contains("DAS")) {
+            return "DARF";
+        }
         /* INSS antes de ISS: senão "INSS" casa o substring "ISS" e vira falso ISS. */
         if (base.contains("INSS")) {
             return "INSS";
@@ -1425,7 +2435,7 @@ public class DocumentoInteligenciaService {
         }
 
         // Vencimento costuma ser confiavel para guias de recolhimento, mas nao para notas.
-        if ("GUIA_IMPOSTO".equals(tipoDocumento)) {
+        if (TipoDocumentoCatalogo.ehGuiaReceitaFederal(tipoDocumento)) {
             String vencimentoExtraido = campos.getOrDefault("vencimento", "");
             if (!vencimentoExtraido.isBlank()) {
                 String vencimentoPendencia = pendencia.getVencimento().toString();
@@ -1435,7 +2445,7 @@ public class DocumentoInteligenciaService {
             }
         }
 
-        if ("GUIA_IMPOSTO".equals(tipoDocumento) && campos.getOrDefault("tributo", "").isBlank()) {
+        if (TipoDocumentoCatalogo.ehGuiaReceitaFederal(tipoDocumento) && campos.getOrDefault("tributo", "").isBlank()) {
             motivosRevisao.add("Tributo nao identificado na guia de recolhimento.");
         }
     }
@@ -1503,12 +2513,26 @@ public class DocumentoInteligenciaService {
 
     private void preencherCamposQuadroIssNfse(String textoBruto, Map<String, String> campos) {
         String t = normalizarEspacosParaValor(textoBruto);
+        String valorServicos = nfseMontanteAposRotulo(t, Pattern.compile(
+                "(?is)valor\\s+dos\\s+servi[cç]os.{0,220}?" + PAT_VAL_BR.pattern()));
         String ded = nfseMontanteAposRotulo(t, Pattern.compile(
                 "(?is)deduc.{0,220}?" + PAT_VAL_BR.pattern()));
         String base = nfseMontanteAposRotulo(t, Pattern.compile(
                 "(?is)base\\s+de\\s+c[aá\u00E1]lculo.{0,220}?" + PAT_VAL_BR.pattern()));
         String vIss = nfseMontanteAposRotulo(t, Pattern.compile(
-                "(?is)valor\\s+do\\s+iss.{0,220}?" + PAT_VAL_BR.pattern()));
+                "(?is)valor\\s+(?:do\\s+)?iss.{0,220}?" + PAT_VAL_BR.pattern()));
+        String pis = nfseMontanteAposRotulo(t, Pattern.compile(
+                "(?is)\\bpis\\b.{0,120}?" + PAT_VAL_BR.pattern()));
+        String cofins = nfseMontanteAposRotulo(t, Pattern.compile(
+                "(?is)\\bcofins\\b.{0,120}?" + PAT_VAL_BR.pattern()));
+        String inss = nfseMontanteAposRotulo(t, Pattern.compile(
+                "(?is)\\binss\\b.{0,120}?" + PAT_VAL_BR.pattern()));
+        String irrf = nfseMontanteAposRotulo(t, Pattern.compile(
+                "(?is)\\birrf\\b.{0,120}?" + PAT_VAL_BR.pattern()));
+        String csll = nfseMontanteAposRotulo(t, Pattern.compile(
+                "(?is)\\bcsll\\b.{0,120}?" + PAT_VAL_BR.pattern()));
+        String valorLiquido = nfseMontanteAposRotulo(t, Pattern.compile(
+                "(?is)valor\\s+l[ií]quido.{0,220}?" + PAT_VAL_BR.pattern()));
         String iptu = nfseMontanteAposRotulo(t, Pattern.compile(
                 "(?is)(?:cr[eé\u00E9]dito\\s+p/|abatimento\\s+iptu).{0,260}?" + PAT_VAL_BR.pattern()));
         String aliq = "";
@@ -1516,10 +2540,17 @@ public class DocumentoInteligenciaService {
         if (ma.find()) {
             aliq = normalizarValorMonetarioBr(ma.group(1));
         }
+        campos.put("valorServicos", safe(valorServicos));
         campos.put("deducoesNfse", safe(ded));
         campos.put("baseCalculoIss", safe(base));
         campos.put("aliquotaIssPercentual", safe(aliq));
         campos.put("valorIss", safe(vIss));
+        campos.put("pis", safe(pis));
+        campos.put("cofins", safe(cofins));
+        campos.put("inss", safe(inss));
+        campos.put("irrf", safe(irrf));
+        campos.put("csll", safe(csll));
+        campos.put("valorLiquido", safe(valorLiquido));
         campos.put("creditoIptu", safe(iptu));
     }
 
@@ -1540,12 +2571,16 @@ public class DocumentoInteligenciaService {
             String tipo,
             double confiancaBase
     ) {
+        tipo = TipoDocumentoCatalogo.refinarGuiaReceitaFederal(texto, tipo);
         String cnpjPrestador = extrairCnpjPrestador(texto);
         String cnpjTomador = extrairCnpjTomador(texto);
         String cnpj = !cnpjPrestador.isBlank() ? cnpjPrestador : extrairCnpj(texto);
+        if (TipoDocumentoCatalogo.ehGuiaReceitaFederal(tipo)) {
+            cnpj = extrairCnpjPrincipalGuiaImposto(texto, cnpjTomador, cnpjPrestador);
+        }
         String valor = extrairValor(texto, tipo);
         String competencia = extrairCompetencia(texto, processamento);
-        String vencimento = extrairData(texto);
+        String vencimento = extrairVencimento(texto, tipo);
         String tributo = inferirTributo(texto);
         double confianca = "DESCONHECIDO".equals(tipo) ? Math.min(confiancaBase, 0.45) : confiancaBase;
         ProcessamentoStatus status = confianca >= 0.75 ? ProcessamentoStatus.PROCESSADO : ProcessamentoStatus.REJEITADO;
@@ -1588,7 +2623,8 @@ public class DocumentoInteligenciaService {
         campos.put("tributo", tributo);
         campos.put("tipoDocumento", tipo);
         Object detalhamentoDocumento = null;
-        if ("NOTA_FISCAL".equals(tipo)) {
+        String capturaPerfil = null;
+        if ("NOTA_FISCAL".equals(tipo) || "NFCE".equals(tipo)) {
             preencherCamposQuadroIssNfse(texto, campos);
         }
         if ("FOLHA_PAGAMENTO".equals(tipo)) {
@@ -1615,6 +2651,17 @@ public class DocumentoInteligenciaService {
                     }
                 }
                 campos.put("tributo", "");
+                capturaPerfil = "HOLERITE_ESCRITORIO_COMPLETO";
+            }
+        }
+        if ("GUIA_IRPF".equals(tipo) || "GUIA_IMPOSTO".equals(tipo)) {
+            Map<String, Object> detGuia = extrairDetalhamentoGuiaImpostoIrpf(texto, campos);
+            if (detGuia != null && !detGuia.isEmpty()) {
+                detalhamentoDocumento = detGuia;
+                capturaPerfil = "GUIA_IMPOSTO_IRPF_COMPLETO";
+                if (!guiaIrpfTopicosCompletos(campos)) {
+                    motivosRevisao.add(motivoGuiaIrpfIncompleta(campos));
+                }
             }
         }
         aplicarValidacoesContabeis(processamento, tipo, campos, motivosRevisao);
@@ -1624,7 +2671,8 @@ public class DocumentoInteligenciaService {
             observacao = motivosRevisao.get(0);
         }
 
-        if (status == ProcessamentoStatus.REJEITADO && motivosRevisao.isEmpty() && "NOTA_FISCAL".equals(tipo)) {
+        if (status == ProcessamentoStatus.REJEITADO && motivosRevisao.isEmpty()
+                && ("NOTA_FISCAL".equals(tipo) || "NFCE".equals(tipo))) {
             List<String> obr = TipoDocumentoCatalogo.camposObrigatorios(tipo);
             boolean cnpjOk = !obr.contains("cnpj") || !campos.getOrDefault("cnpj", "").isBlank();
             boolean valorOk = !obr.contains("valor") || !campos.getOrDefault("valor", "").isBlank();
@@ -1646,7 +2694,8 @@ public class DocumentoInteligenciaService {
                 confianca,
                 status == ProcessamentoStatus.PROCESSADO ? "SUCESSO" : "REJEITADO",
                 motivosRevisao,
-                detalhamentoDocumento
+                detalhamentoDocumento,
+                capturaPerfil
         ));
         processamento.setObservacaoProcessamento(observacao);
         processamento.setSeveridade(severidade);
@@ -1685,7 +2734,11 @@ public class DocumentoInteligenciaService {
 
         boolean tipoFiscal = tipoDetectado.contains("NOTA")
                 || tipoDetectado.contains("NFE")
-                || tipoDetectado.contains("NFSE");
+                || tipoDetectado.contains("NFSE")
+                || tipoDetectado.contains("NFCE")
+                || tipoDetectado.contains("CTE")
+                || tipoDetectado.contains("MDFE")
+                || tipoDetectado.contains("CTE_OS");
 
         if (pendencia.getEmpresa() != null) {
             String cnpjEmpresa = pendencia.getEmpresa().getCnpj();

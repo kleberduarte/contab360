@@ -1,0 +1,31 @@
+﻿# === Metadados massa Contab360 (gerado por scripts/generate_doc_test_mass.ps1) ===
+# escopo_pendencia (massa): PJ
+#   PJ -> nome empresarial de referencia: ACME SERVICOS CONTABEIS LTDA
+#   PF -> nome da pessoa fisica de referencia: Maria Fernanda Costa Oliveira | CPF 529.982.247-25 (52998224725)
+# Ajuste as pendencias para competencia 2026-04 e CNPJ da empresa = 12.345.678/0001-95 (12345678000195) quando aplicavel.
+# tipo_documento_detectado_esperado: SPED_FISCAL_CONTRIBUICOES
+# aba_carrossel_esperada: SPED_FISCAL_CONTRIBUICOES
+# fonte_leitura: texto
+#
+# Estrutura JSON gravada em dadosExtraidosJson (resumo):
+#   fonte, tipoDocumento, status, confianca, camposObrigatorios[], camposExtraidos{}, motivosRevisao[]
+#   + detalhamentoDocumento? + capturaPerfil? (holerite / guia IRPF completos)
+#
+# Chaves tipicas em camposExtraidos para este cenario:
+#   - cnpj
+#   - cnpjPrestador
+#   - cnpjTomador
+#   - valor
+#   - competencia
+#   - vencimento
+#   - tributo
+#   - tipoDocumento
+# === Fim metadados / inicio do texto simulado ===
+
+SPED Fiscal  -  EFD Contribuicoes (Leiaute versao 1.0  -  trecho simulado)
+Nome empresarial: ACME SERVICOS CONTABEIS LTDA
+CNPJ: 12.345.678/0001-95
+Periodo de apuracao: 04/2026
+Registro |0000| ABERTURA|1|
+Registro |0001| DADOS|1|
+Texto de validacao: EFD contribuicoes  -  arquivo aceito (simulado)

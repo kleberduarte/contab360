@@ -1380,6 +1380,7 @@
             EXTRATO_BANCARIO: `${svg}<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`,
             RECIBO_DESPESA: `${svg}<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"/><path d="M8 10h8"/><path d="M8 14h5"/></svg>`,
             GUIA_IMPOSTO: `${svg}<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>`,
+            GUIA_IRPF: `${svg}<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>`,
             CONTRATO_SOCIAL: `${svg}<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/><path d="M9 12h.01"/></svg>`,
             ATA_REUNIAO: `${svg}<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
             DECLARACAO_ACESSORIA: `${svg}<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/></svg>`,
@@ -1387,7 +1388,13 @@
             FLUXO_CAIXA: `${svg}<path d="M3 3v18h18"/><path d="M7 12l4-4 4 4 4-4"/><path d="M7 18h10"/></svg>`,
             OUTROS: `${svg}<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>`,
         };
-        return icons[id] || icons.OUTROS;
+        if (icons[id]) {
+            return icons[id];
+        }
+        if (/^GUIA_(IRPJ|CSLL|PIS|COFINS|IPI|IOF|IRRF|CIDE|II|ITR|FUNRURAL)$/.test(id)) {
+            return icons.GUIA_IRPF || icons.GUIA_IMPOSTO || icons.OUTROS;
+        }
+        return icons.OUTROS;
     }
 
     function idAbaFromPayload(a) {
@@ -1397,7 +1404,19 @@
         if (t.includes("holerite") || t.includes("folha")) return "FOLHA_PAGAMENTO";
         if (t.includes("extrato")) return "EXTRATO_BANCARIO";
         if (t.includes("recibo")) return "RECIBO_DESPESA";
-        if (t.includes("guia")) return "GUIA_IMPOSTO";
+        if (t.includes("irpf")) return "GUIA_IRPF";
+        if (t.includes("irpj")) return "GUIA_IRPJ";
+        if (t.includes("csll")) return "GUIA_CSLL";
+        if (t.includes("cofins")) return "GUIA_COFINS";
+        if (t.includes("ipi")) return "GUIA_IPI";
+        if (t.includes("pis")) return "GUIA_PIS";
+        if (t.includes("iof")) return "GUIA_IOF";
+        if (t.includes("irrf")) return "GUIA_IRRF";
+        if (/\bcide\b/i.test(t)) return "GUIA_CIDE";
+        if (t.includes("import")) return "GUIA_II";
+        if (t.includes("itr")) return "GUIA_ITR";
+        if (t.includes("funrural")) return "GUIA_FUNRURAL";
+        if (t.includes("guia")) return "GUIA_IRPF";
         if (t.includes("contrato")) return "CONTRATO_SOCIAL";
         if (t.includes("ata")) return "ATA_REUNIAO";
         if (t.includes("declara")) return "DECLARACAO_ACESSORIA";

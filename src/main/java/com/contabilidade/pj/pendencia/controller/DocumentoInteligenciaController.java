@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -58,6 +59,16 @@ public class DocumentoInteligenciaController {
         return documentoInteligenciaService.listar(usuario, somenteRevisar, incluirConcluidosNaRevisao).stream()
                 .map(DocumentoProcessamentoResponse::fromEntity)
                 .toList();
+    }
+
+    @PostMapping("/{processamentoId}/reprocessar")
+    public DocumentoProcessamentoResponse reprocessar(@PathVariable Long processamentoId) {
+        Usuario usuario = AuthContext.get();
+        if (usuario == null) {
+            throw new IllegalArgumentException("Usuário não autenticado.");
+        }
+        return DocumentoProcessamentoResponse.fromEntity(
+                documentoInteligenciaService.reprocessar(processamentoId, usuario));
     }
 
     @PatchMapping("/{processamentoId}/campos")

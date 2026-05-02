@@ -1,0 +1,31 @@
+﻿# === Metadados massa Contab360 (gerado por scripts/generate_doc_test_mass.ps1) ===
+# escopo_pendencia (massa): PF
+#   PJ -> nome empresarial de referencia: ACME SERVICOS CONTABEIS LTDA
+#   PF -> nome da pessoa fisica de referencia: Maria Fernanda Costa Oliveira | CPF 529.982.247-25 (52998224725)
+# Ajuste as pendencias para competencia 2026-04 e CNPJ da empresa = 12.345.678/0001-95 (12345678000195) quando aplicavel.
+# tipo_documento_detectado_esperado: DESCONHECIDO
+# aba_carrossel_esperada: OUTROS
+# fonte_leitura: texto
+#
+# Estrutura JSON gravada em dadosExtraidosJson (resumo):
+#   fonte, tipoDocumento, status, confianca, camposObrigatorios[], camposExtraidos{}, motivosRevisao[]
+#   + detalhamentoDocumento? + capturaPerfil? (holerite / guia IRPF completos)
+#
+# Chaves tipicas em camposExtraidos para este cenario:
+#   - tipoDocumento
+#   - cpf
+#   - nomeCompleto
+#   - valor?
+#   - competencia?
+#   - motivosRevisao (provavel)
+#
+# Notas: Tende a DESCONHECIDO / baixa confianca; perfil CLIENTE pode nao listar se status nao for PROCESSADO.
+# === Fim metadados / inicio do texto simulado ===
+
+DEMONSTRATIVO DE PAGAMENTO  -  CarnÃª-Leao / rendimentos tributaveis PF (simulado)
+Contribuinte: Maria Fernanda Costa Oliveira
+CPF: 529.982.247-25
+Competencia: 04/2026
+Rendimento tributavel recebido de pessoa juridica: R$ 4.800,00
+Imposto devido (estimativa): R$ 192,00 | Codigo DARF: 0190 (exemplo)
+Observacao: documento generico para teste  -  pode classificar como DESCONHECIDO se faltar contexto.

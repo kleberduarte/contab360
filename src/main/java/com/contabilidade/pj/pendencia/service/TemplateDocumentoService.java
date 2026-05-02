@@ -7,6 +7,8 @@ import com.contabilidade.pj.clientepf.ClientePessoaFisicaRepository;
 import com.contabilidade.pj.empresa.entity.Empresa;
 import com.contabilidade.pj.empresa.repository.EmpresaRepository;
 import java.util.List;
+import java.util.Locale;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.contabilidade.pj.pendencia.entity.*;
@@ -18,15 +20,21 @@ public class TemplateDocumentoService {
     private final TemplateDocumentoRepository templateDocumentoRepository;
     private final EmpresaRepository empresaRepository;
     private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
+    private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
+    private final DocTabMapperService docTabMapperService;
 
     public TemplateDocumentoService(
             TemplateDocumentoRepository templateDocumentoRepository,
             EmpresaRepository empresaRepository,
-            ClientePessoaFisicaRepository clientePessoaFisicaRepository
+            ClientePessoaFisicaRepository clientePessoaFisicaRepository,
+            PendenciaDocumentoRepository pendenciaDocumentoRepository,
+            DocTabMapperService docTabMapperService
     ) {
         this.templateDocumentoRepository = templateDocumentoRepository;
         this.empresaRepository = empresaRepository;
         this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
+        this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
+        this.docTabMapperService = docTabMapperService;
     }
 
     @Transactional(readOnly = true)
@@ -53,6 +61,14 @@ public class TemplateDocumentoService {
         return templateDocumentoRepository.findByClientePessoaFisicaIdOrderByNomeAsc(idPermitido);
     }
 
+    @Transactional(readOnly = true)
+    public List<String> listarSugestoesNomes() {
+        return docTabMapperService.ordemAbas().stream()
+                .filter(id -> !"OUTROS".equals(id))
+                .map(docTabMapperService::tituloAba)
+                .toList();
+    }
+
     @Transactional
     public TemplateDocumento criar(
             Long empresaId,
@@ -69,9 +85,13 @@ public class TemplateDocumentoService {
         if (temEmpresa == temPf) {
             throw new IllegalArgumentException("Informe empresaId ou clientePessoaFisicaId (apenas um).");
         }
+        String nomeNormalizado = nome != null ? nome.trim() : "";
+        if (nomeNormalizado.isEmpty()) {
+            throw new IllegalArgumentException("Informe o nome do documento.");
+        }
 
         TemplateDocumento template = new TemplateDocumento();
-        template.setNome(nome);
+        template.setNome(nomeNormalizado);
         template.setObrigatorio(obrigatorio);
 
         if (temEmpresa) {
@@ -81,6 +101,9 @@ public class TemplateDocumentoService {
             if (!empresa.isAtivo()) {
                 throw new IllegalArgumentException("Empresa inativa. Reative-a antes de cadastrar template.");
             }
+            if (templateDocumentoRepository.existsByEmpresaIdAndNomeIgnoreCase(empresaId, nomeNormalizado)) {
+                throw new IllegalArgumentException("Já existe um template com esse nome para esta empresa.");
+            }
             template.setEmpresa(empresa);
         } else {
             ClientePessoaFisica pf = clientePessoaFisicaRepository
@@ -89,9 +112,98 @@ public class TemplateDocumentoService {
             if (!pf.isAtivo()) {
                 throw new IllegalArgumentException("Cadastro PF inativo. Reative antes de cadastrar template.");
             }
+            if (templateDocumentoRepository
+                    .existsByClientePessoaFisicaIdAndNomeIgnoreCase(clientePessoaFisicaId, nomeNormalizado)) {
+                throw new IllegalArgumentException("Já existe um template com esse nome para esta pessoa física.");
+            }
             template.setClientePessoaFisica(pf);
         }
 
-        return templateDocumentoRepository.save(template);
+        try {
+            return templateDocumentoRepository.save(template);
+        } catch (DataIntegrityViolationException ex) {
+            throw traduzirErroPersistencia(ex);
+        }
+    }
+
+    @Transactional
+    public TemplateDocumento atualizar(Long id, String nome, boolean obrigatorio, Usuario usuarioAtual) {
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
+            throw new IllegalArgumentException("Apenas contador pode atualizar template.");
+        }
+        TemplateDocumento template = templateDocumentoRepository
+                .findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Template não encontrado."));
+        String nomeNormalizado = nome != null ? nome.trim() : "";
+        if (nomeNormalizado.isEmpty()) {
+            throw new IllegalArgumentException("Informe o nome do documento.");
+        }
+
+        if (template.getEmpresa() != null) {
+            Long empresaId = template.getEmpresa().getId();
+            if (templateDocumentoRepository.existsByEmpresaIdAndNomeIgnoreCaseAndIdNot(empresaId, nomeNormalizado, id)) {
+                throw new IllegalArgumentException("Já existe um template com esse nome para esta empresa.");
+            }
+        } else if (template.getClientePessoaFisica() != null) {
+            Long clientePessoaFisicaId = template.getClientePessoaFisica().getId();
+            if (templateDocumentoRepository.existsByClientePessoaFisicaIdAndNomeIgnoreCaseAndIdNot(
+                    clientePessoaFisicaId, nomeNormalizado, id)) {
+                throw new IllegalArgumentException("Já existe um template com esse nome para esta pessoa física.");
+            }
+        }
+
+        template.setNome(nomeNormalizado);
+        template.setObrigatorio(obrigatorio);
+        try {
+            return templateDocumentoRepository.save(template);
+        } catch (DataIntegrityViolationException ex) {
+            throw traduzirErroPersistencia(ex);
+        }
+    }
+
+    @Transactional
+    public void remover(Long id, Usuario usuarioAtual) {
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
+            throw new IllegalArgumentException("Apenas contador pode excluir template.");
+        }
+        TemplateDocumento template = templateDocumentoRepository
+                .findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Template não encontrado."));
+        if (pendenciaDocumentoRepository.countByTemplateDocumento_Id(id) > 0) {
+            throw new IllegalArgumentException("Não é possível excluir: existem pendências vinculadas a este template.");
+        }
+        templateDocumentoRepository.delete(template);
+    }
+
+    private IllegalArgumentException traduzirErroPersistencia(DataIntegrityViolationException ex) {
+        String msg = ex.getMostSpecificCause() != null
+                ? ex.getMostSpecificCause().getMessage()
+                : ex.getMessage();
+        String normalizada = msg == null ? "" : msg.toLowerCase(Locale.ROOT);
+        if (normalizada.contains("duplicate")
+                || normalizada.contains("duplic")
+                || normalizada.contains("unique")
+                || normalizada.contains("uniq_")) {
+            return new IllegalArgumentException("Já existe um template com esses dados. Verifique nome e tomador.");
+        }
+        if (normalizada.contains("foreign key")
+                || normalizada.contains("constraint fails")
+                || normalizada.contains("references")) {
+            return new IllegalArgumentException("Falha ao salvar template: tomador inválido ou relacionamento inexistente no banco.");
+        }
+        if (normalizada.contains("cannot be null")
+                || normalizada.contains("null value")) {
+            return new IllegalArgumentException("Falha ao salvar template: um campo obrigatório ficou nulo no banco.");
+        }
+        if (normalizada.contains("data too long")
+                || normalizada.contains("value too long")) {
+            return new IllegalArgumentException("Falha ao salvar template: nome do template excede o tamanho permitido.");
+        }
+        if (normalizada.contains("incorrect string value")
+                || normalizada.contains("character set")
+                || normalizada.contains("collation")) {
+            return new IllegalArgumentException("Falha ao salvar template: erro de codificação/charset no banco.");
+        }
+        return new IllegalArgumentException("Falha ao salvar template. Verifique os dados do tomador e tente novamente.");
     }
 }

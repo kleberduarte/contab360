@@ -13,6 +13,8 @@ public interface PendenciaDocumentoRepository extends JpaRepository<PendenciaDoc
 
     long countByClientePessoaFisica_Id(Long clientePessoaFisicaId);
 
+    long countByTemplateDocumento_Id(Long templateDocumentoId);
+
     List<PendenciaDocumento> findByCompetenciaId(Long competenciaId);
 
     @Query("""

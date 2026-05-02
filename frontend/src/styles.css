@@ -23,9 +23,24 @@
   --radius-sm: 10px;
   --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);
   --ring: 0 0 0 3px var(--accent-soft);
+  --doc-tab-alpha-border: 0.24;
+  --doc-tab-alpha-bg: 0.06;
+  --doc-tab-alpha-badge-bg: 0.09;
+  --doc-tab-alpha-ring: 0.24;
   font-family: var(--font);
   color: var(--text);
   background: var(--bg);
+}
+
+/* Intensidade dos grupos do carrossel.
+   Padrão: suave (:root). Para deixar vibrante, aplique no body:
+   class="theme-doc-tabs--vibrante" ou data-doc-tabs-tone="vibrante". */
+body.theme-doc-tabs--vibrante,
+body[data-doc-tabs-tone="vibrante"] {
+  --doc-tab-alpha-border: 0.34;
+  --doc-tab-alpha-bg: 0.12;
+  --doc-tab-alpha-badge-bg: 0.16;
+  --doc-tab-alpha-ring: 0.3;
 }
 
 * {
@@ -1798,8 +1813,13 @@ button.small:hover:not(:disabled) {
 .pendencias-lead {
   margin: 0;
   font-size: 0.92rem;
-  max-width: 40rem;
-  line-height: 1.45;
+  max-width: 42rem;
+  line-height: 1.5;
+}
+
+.pendencias-lead-strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .pendencias-help {
@@ -1860,16 +1880,383 @@ button.small:hover:not(:disabled) {
 
 .pendencias-form {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem 1.25rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  width: 100%;
 }
 
-.pendencias-fields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(5.5rem, 7.5rem));
+.pendencias-form > .pendencias-actions {
+  align-self: flex-start;
+}
+
+.pendencias-form > .pendencias-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+/* Form compacto: competência + escopo */
+.pendencias-form__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.pendencias-form__group--competencia {
+  gap: 0;
+}
+
+.pendencias-form__group-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* Bloco competência — card compacto, sem campo “esticado” */
+.pendencias-competencia-card {
+  padding: 1rem 1.1rem 1.05rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 88%, var(--accent) 12%);
+  background: linear-gradient(160deg, var(--surface) 0%, var(--fill-tertiary) 55%, color-mix(in srgb, var(--accent-soft) 45%, var(--surface)) 100%);
+  box-shadow: var(--shadow-sm), 0 0 0 1px color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.pendencias-competencia-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.pendencias-competencia-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  opacity: 0.95;
+}
+
+.pendencias-competencia-card__title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pendencias-competencia-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem 0.85rem;
+}
+
+.pendencias-competencia-picker {
+  position: relative;
+  width: 100%;
+  max-width: min(100%, 17.5rem);
+}
+
+.pendencias-competencia-picker__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.5rem 0.65rem 0.5rem 0.75rem;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 94%, var(--text) 6%);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 2px rgba(15, 23, 42, 0.05);
+  color: var(--text);
+  color-scheme: light dark;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.pendencias-competencia-picker__trigger:hover {
+  border-color: color-mix(in srgb, var(--border-strong) 70%, var(--accent) 30%);
+}
+
+.pendencias-competencia-picker__trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.pendencias-competencia-picker__trigger-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.pendencias-competencia-picker__chev {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--muted);
+  opacity: 0.85;
+  transition: transform 0.2s var(--ease-spring);
+}
+
+.pendencias-competencia-picker:has(.pendencias-rdp-pop) .pendencias-competencia-picker__chev {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.pendencias-rdp-pop {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  left: 0;
+  padding: 0.65rem 0.7rem 0.75rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 88%, var(--accent) 12%);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg), 0 0 0 1px color-mix(in srgb, var(--surface) 70%, transparent);
+  animation: pendencias-rdp-in 0.22s var(--ease-spring);
+}
+
+@keyframes pendencias-rdp-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pendencias-rdp-pop {
+    animation: none;
+  }
+}
+
+.pendencias-rdp-pop .pendencias-rdp,
+.pendencias-rdp-pop .rdp-root {
+  --rdp-accent-color: var(--accent);
+  --rdp-accent-background-color: var(--accent-soft-strong);
+  --rdp-day-height: 2.25rem;
+  --rdp-day-width: 2.25rem;
+  --rdp-day_button-height: 2.1rem;
+  --rdp-day_button-width: 2.1rem;
+  --rdp-day_button-border-radius: 10px;
+  --rdp-nav_button-height: 2.1rem;
+  --rdp-nav_button-width: 2.1rem;
+  --rdp-selected-border: 2px solid var(--rdp-accent-color);
+}
+
+.pendencias-rdp-pop .rdp-dropdown {
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--fill-secondary);
+  padding: 0.25rem 0.35rem;
+}
+
+.pendencias-rdp-pop .rdp-caption_label {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.pendencias-rdp--month-only .rdp-dropdown_root .rdp-caption_label,
+.pendencias-rdp--month-only .rdp-dropdown_root .rdp-chevron {
+  display: none;
+}
+
+.pendencias-rdp--month-only .rdp-dropdown_root .rdp-dropdown {
+  z-index: auto;
+  opacity: 1;
+  appearance: auto;
+  position: static;
+  inset: auto;
+  width: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--fill-secondary);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.25rem 0.35rem;
+}
+
+.pendencias-rdp--month-only .rdp-month_grid,
+.pendencias-rdp--month-only .rdp-weekdays,
+.pendencias-rdp--month-only .rdp-weekday,
+.pendencias-rdp--month-only .rdp-weeks {
+  display: none;
+}
+
+.pendencias-field--month {
+  flex: 0 1 auto;
+  width: fit-content;
+  max-width: min(100%, 18.5rem);
+}
+
+.pendencias-field__lbl--soft {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--muted) 92%, var(--text) 8%);
+}
+
+.pendencias-competencia-meta {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pendencias-competencia-flag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0 0.62rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+}
+
+.pendencias-competencia-reset {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pendencias-competencia-reset:hover {
+  color: var(--accent-hover);
+}
+
+.pendencias-escopo-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.pendencias-field__input--escopo {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Painel tomador + segment PJ/PF */
+.pendencias-tomador-panel {
+  width: 100%;
+  padding: 1rem 1.05rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.pendencias-tomador-panel__head {
+  margin-bottom: 0.85rem;
+}
+
+.pendencias-tomador-panel__title {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.pendencias-tomador-panel__sub {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.pendencias-tomador-panel__sub strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pendencias-tomador-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   gap: 0.75rem 1rem;
+}
+
+.pendencias-segment {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--fill-quaternary);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.pendencias-segment__btn {
+  margin: 0;
+  padding: 0.45rem 0.85rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.pendencias-segment__btn:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.pendencias-segment__btn--on {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.pendencias-field--panel {
+  min-width: min(100%, 14rem);
+}
+
+.pendencias-field__input--panel {
+  min-height: 2.75rem;
+}
+
+.pendencias-field--grow {
+  flex: 1 1 12rem;
+  min-width: 10rem;
 }
 
 .pendencias-field {
@@ -2025,10 +2412,6 @@ button.small:hover:not(:disabled) {
 }
 
 @media (max-width: 720px) {
-  .pendencias-fields {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .pendencias-form {
     flex-direction: column;
     align-items: stretch;
@@ -2076,23 +2459,95 @@ button.small:hover:not(:disabled) {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.75rem;
+}
+
+.cliente-competencia-info {
+  margin: 0.35rem 0 1rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--accent-border-soft);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(33, 194, 94, 0.11) 0%, rgba(33, 194, 94, 0.04) 100%);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cliente-competencia-info__badge {
+  display: inline-flex;
+  align-items: center;
+  height: 1.5rem;
+  padding: 0 0.58rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border-soft);
+  background: #fff;
+  color: #138247;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cliente-competencia-info__text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .cliente-pendencia-item {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.75rem 0.85rem;
-  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.82rem 0.92rem;
+  background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cliente-pendencia-item:hover {
+  border-color: var(--accent-border-soft);
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
 }
 
 .cliente-pendencia-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.65rem;
   justify-content: space-between;
-  font-size: 0.92rem;
+}
+
+.cliente-pendencia-head__main {
+  min-width: 0;
+}
+
+.cliente-pendencia-head__title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 640;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.cliente-pendencia-head__meta {
+  margin: 0.16rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.cliente-pendencia-head__id {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--fill-tertiary);
+  color: #475569;
+  font-weight: 600;
 }
 
 .small-btn {
@@ -2909,6 +3364,45 @@ button.small:hover:not(:disabled) {
   color: var(--muted);
 }
 
+.docs-validados-tone-switch-react {
+  margin: 0.35rem 0 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--fill-tertiary);
+}
+
+.docs-validados-tone-switch-react__label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 0 0.2rem 0 0.35rem;
+}
+
+.docs-validados-tone-switch-react__btn {
+  font: inherit;
+  font-size: 0.72rem;
+  color: var(--muted);
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+}
+
+.docs-validados-tone-switch-react__btn:hover {
+  color: var(--text);
+}
+
+.docs-validados-tone-switch-react__btn.is-active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
 .docs-validados-loading-react {
   display: flex;
   align-items: center;
@@ -3068,6 +3562,204 @@ button.small:hover:not(:disabled) {
   min-height: 2.45em;
 }
 
+.doc-tab-carousel__subtipo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.05rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--fill-secondary);
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.doc-tab--nfe .doc-tab-carousel__icon,
+.doc-tab--nfse .doc-tab-carousel__icon,
+.doc-tab--nfce .doc-tab-carousel__icon,
+.doc-tab--cte .doc-tab-carousel__icon,
+.doc-tab--mdfe .doc-tab-carousel__icon,
+.doc-tab--cte-os .doc-tab-carousel__icon {
+  border-color: rgb(37 99 235 / var(--doc-tab-alpha-border));
+  background: rgb(59 130 246 / var(--doc-tab-alpha-bg));
+  color: #1d4ed8;
+}
+
+.doc-tab--nfe .doc-tab-carousel__subtipo-badge,
+.doc-tab--nfse .doc-tab-carousel__subtipo-badge,
+.doc-tab--nfce .doc-tab-carousel__subtipo-badge,
+.doc-tab--cte .doc-tab-carousel__subtipo-badge,
+.doc-tab--mdfe .doc-tab-carousel__subtipo-badge,
+.doc-tab--cte-os .doc-tab-carousel__subtipo-badge {
+  border-color: rgb(37 99 235 / var(--doc-tab-alpha-border));
+  background: rgb(59 130 246 / var(--doc-tab-alpha-badge-bg));
+  color: #1e40af;
+}
+
+.doc-tab--nfe .doc-tab-carousel__count,
+.doc-tab--nfse .doc-tab-carousel__count,
+.doc-tab--nfce .doc-tab-carousel__count,
+.doc-tab--cte .doc-tab-carousel__count,
+.doc-tab--mdfe .doc-tab-carousel__count,
+.doc-tab--cte-os .doc-tab-carousel__count {
+  background: #2563eb;
+}
+
+.doc-tab--nfe.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--nfse.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--nfce.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--cte.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--mdfe.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--cte-os.doc-tab--active .doc-tab-carousel__icon {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgb(59 130 246 / var(--doc-tab-alpha-ring));
+  color: #1d4ed8;
+}
+
+/* Guias e impostos */
+.doc-tab--guia-imposto .doc-tab-carousel__icon {
+  border-color: rgb(202 138 4 / var(--doc-tab-alpha-border));
+  background: rgb(234 179 8 / var(--doc-tab-alpha-bg));
+  color: #92400e;
+}
+
+.doc-tab--guia-imposto .doc-tab-carousel__count {
+  background: #ca8a04;
+}
+
+.doc-tab--guia-imposto.doc-tab--active .doc-tab-carousel__icon {
+  border-color: #ca8a04;
+  box-shadow: 0 0 0 2px rgb(234 179 8 / var(--doc-tab-alpha-ring));
+  color: #854d0e;
+}
+
+/* Obrigações e declarações */
+.doc-tab--declaracao-obrigacao .doc-tab-carousel__icon,
+.doc-tab--sped-fiscal-contribuicoes .doc-tab-carousel__icon,
+.doc-tab--sped-contabil-fiscal .doc-tab-carousel__icon {
+  border-color: rgb(147 51 234 / var(--doc-tab-alpha-border));
+  background: rgb(168 85 247 / var(--doc-tab-alpha-bg));
+  color: #6b21a8;
+}
+
+.doc-tab--declaracao-obrigacao .doc-tab-carousel__count,
+.doc-tab--sped-fiscal-contribuicoes .doc-tab-carousel__count,
+.doc-tab--sped-contabil-fiscal .doc-tab-carousel__count {
+  background: #9333ea;
+}
+
+.doc-tab--declaracao-obrigacao.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--sped-fiscal-contribuicoes.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--sped-contabil-fiscal.doc-tab--active .doc-tab-carousel__icon {
+  border-color: #9333ea;
+  box-shadow: 0 0 0 2px rgb(168 85 247 / var(--doc-tab-alpha-ring));
+  color: #6b21a8;
+}
+
+/* Financeiro */
+.doc-tab--extrato-bancario .doc-tab-carousel__icon,
+.doc-tab--conciliacao-financeira .doc-tab-carousel__icon,
+.doc-tab--contas-pagar-receber .doc-tab-carousel__icon,
+.doc-tab--fluxo-caixa .doc-tab-carousel__icon,
+.doc-tab--emprestimo-financiamento .doc-tab-carousel__icon {
+  border-color: rgb(5 150 105 / var(--doc-tab-alpha-border));
+  background: rgb(16 185 129 / var(--doc-tab-alpha-bg));
+  color: #065f46;
+}
+
+.doc-tab--extrato-bancario .doc-tab-carousel__count,
+.doc-tab--conciliacao-financeira .doc-tab-carousel__count,
+.doc-tab--contas-pagar-receber .doc-tab-carousel__count,
+.doc-tab--fluxo-caixa .doc-tab-carousel__count,
+.doc-tab--emprestimo-financiamento .doc-tab-carousel__count {
+  background: #059669;
+}
+
+.doc-tab--extrato-bancario.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--conciliacao-financeira.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--contas-pagar-receber.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--fluxo-caixa.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--emprestimo-financiamento.doc-tab--active .doc-tab-carousel__icon {
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgb(16 185 129 / var(--doc-tab-alpha-ring));
+  color: #065f46;
+}
+
+/* Societário e jurídico */
+.doc-tab--contratos-socios .doc-tab-carousel__icon,
+.doc-tab--atas-e-registros .doc-tab-carousel__icon,
+.doc-tab--certidoes-licencas .doc-tab-carousel__icon,
+.doc-tab--processos-fiscais-juridicos .doc-tab-carousel__icon,
+.doc-tab--certificado-digital .doc-tab-carousel__icon {
+  border-color: rgb(14 116 144 / var(--doc-tab-alpha-border));
+  background: rgb(6 182 212 / var(--doc-tab-alpha-bg));
+  color: #155e75;
+}
+
+.doc-tab--contratos-socios .doc-tab-carousel__count,
+.doc-tab--atas-e-registros .doc-tab-carousel__count,
+.doc-tab--certidoes-licencas .doc-tab-carousel__count,
+.doc-tab--processos-fiscais-juridicos .doc-tab-carousel__count,
+.doc-tab--certificado-digital .doc-tab-carousel__count {
+  background: #0891b2;
+}
+
+.doc-tab--contratos-socios.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--atas-e-registros.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--certidoes-licencas.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--processos-fiscais-juridicos.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--certificado-digital.doc-tab--active .doc-tab-carousel__icon {
+  border-color: #0891b2;
+  box-shadow: 0 0 0 2px rgb(6 182 212 / var(--doc-tab-alpha-ring));
+  color: #155e75;
+}
+
+/* Operacional/contábil */
+.doc-tab--folha-pagamento .doc-tab-carousel__icon,
+.doc-tab--recibo-despesa .doc-tab-carousel__icon,
+.doc-tab--balancetes-demonstracoes .doc-tab-carousel__icon,
+.doc-tab--patrimonio-imobilizado .doc-tab-carousel__icon,
+.doc-tab--estoque-custo .doc-tab-carousel__icon,
+.doc-tab--comercio-exterior-cambio .doc-tab-carousel__icon,
+.doc-tab--seguros-apolices .doc-tab-carousel__icon,
+.doc-tab--relatorios-gerenciais .doc-tab-carousel__icon {
+  border-color: rgb(71 85 105 / var(--doc-tab-alpha-border));
+  background: rgb(100 116 139 / var(--doc-tab-alpha-bg));
+  color: #334155;
+}
+
+.doc-tab--carousel.doc-tab--active .doc-tab-carousel__label {
+  color: var(--text);
+}
+
+.doc-tab--folha-pagamento .doc-tab-carousel__count,
+.doc-tab--recibo-despesa .doc-tab-carousel__count,
+.doc-tab--balancetes-demonstracoes .doc-tab-carousel__count,
+.doc-tab--patrimonio-imobilizado .doc-tab-carousel__count,
+.doc-tab--estoque-custo .doc-tab-carousel__count,
+.doc-tab--comercio-exterior-cambio .doc-tab-carousel__count,
+.doc-tab--seguros-apolices .doc-tab-carousel__count,
+.doc-tab--relatorios-gerenciais .doc-tab-carousel__count {
+  background: #475569;
+}
+
+.doc-tab--folha-pagamento.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--recibo-despesa.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--balancetes-demonstracoes.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--patrimonio-imobilizado.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--estoque-custo.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--comercio-exterior-cambio.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--seguros-apolices.doc-tab--active .doc-tab-carousel__icon,
+.doc-tab--relatorios-gerenciais.doc-tab--active .doc-tab-carousel__icon {
+  border-color: #475569;
+  box-shadow: 0 0 0 2px rgb(100 116 139 / var(--doc-tab-alpha-ring));
+  color: #1e293b;
+}
+
 .doc-tab-carousel__count {
   position: absolute;
   top: -4px;
@@ -3224,6 +3916,13 @@ button.small:hover:not(:disabled) {
 
 .doc-chip--conf {
   background: #fef9c3;
+}
+
+.doc-chip--erro {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+  font-weight: 600;
 }
 
 .doc-validado-kpis-react {
@@ -3582,6 +4281,112 @@ button.small:hover:not(:disabled) {
 .holerite-k {
   color: #64748b;
   font-size: 0.72rem;
+}
+
+.guia-imposto-painel-react {
+  border-style: solid;
+  border-color: #dbe7f5;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7ff 100%);
+  padding: 1rem;
+}
+
+.guia-imposto-badge-react {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.guia-imposto-secao-react {
+  margin-bottom: 1rem;
+  border: 1px solid #d9e3f1;
+  border-radius: 14px;
+  background: #fff;
+  padding: 0.8rem;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.guia-imposto-secao-react:last-child {
+  margin-bottom: 0;
+}
+
+.guia-imposto-secao-titulo-react {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #e8eff8;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #1e293b;
+}
+
+.guia-imposto-secao-indice-react {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.guia-imposto-campos-grid-react {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.7rem;
+}
+
+.guia-imposto-campo-card-react {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 92px;
+  padding: 0.68rem 0.72rem;
+  border: 1px solid #dde6f2;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff 0%, #f7faff 100%);
+}
+
+.guia-imposto-campo-top-react {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.guia-imposto-campo-label-react {
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.guia-imposto-campo-valor-react {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.94rem;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.guia-imposto-campo-input-react {
+  min-height: 40px;
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
 .fiscal-page-react h3 {

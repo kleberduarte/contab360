@@ -1,5 +1,7 @@
 package com.contabilidade.pj.auth.service;
 
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
+import com.contabilidade.pj.clientepf.ClientePessoaFisicaRepository;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -15,14 +17,17 @@ public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
     private final SessaoAcessoRepository sessaoAcessoRepository;
+    private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public AuthService(
             UsuarioRepository usuarioRepository,
-            SessaoAcessoRepository sessaoAcessoRepository
+            SessaoAcessoRepository sessaoAcessoRepository,
+            ClientePessoaFisicaRepository clientePessoaFisicaRepository
     ) {
         this.usuarioRepository = usuarioRepository;
         this.sessaoAcessoRepository = sessaoAcessoRepository;
+        this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
     }
 
     @Transactional
@@ -33,6 +38,7 @@ public class AuthService {
         if (!passwordEncoder.matches(senha, usuario.getSenhaHash())) {
             throw new IllegalArgumentException("Credenciais inválidas.");
         }
+        usuario = vincularClientePfAutomaticamente(usuario);
 
         sessaoAcessoRepository.deleteByExpiraEmBefore(LocalDateTime.now());
 
@@ -43,6 +49,23 @@ public class AuthService {
         sessaoAcessoRepository.save(sessao);
 
         return LoginResponse.from(usuario, sessao.getToken(), sessao.getExpiraEm());
+    }
+
+    private Usuario vincularClientePfAutomaticamente(Usuario usuario) {
+        if (usuario.getPerfil() != PerfilUsuario.CLIENTE || usuario.getClientePessoaFisica() != null) {
+            return usuario;
+        }
+        if (usuario.getNome() == null || usuario.getNome().isBlank()) {
+            return usuario;
+        }
+        ClientePessoaFisica clientePf = clientePessoaFisicaRepository
+                .findFirstByNomeCompletoIgnoreCase(usuario.getNome().trim())
+                .orElse(null);
+        if (clientePf == null) {
+            return usuario;
+        }
+        usuario.setClientePessoaFisica(clientePf);
+        return usuarioRepository.save(usuario);
     }
 
     @Transactional(readOnly = true)

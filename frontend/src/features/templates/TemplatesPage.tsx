@@ -1,6 +1,8 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
+import { formatApiError } from "../../lib/errors";
 import { Sessao } from "../../lib/session";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 type Empresa = {
   id: number;
@@ -55,12 +57,17 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
   const [tomadorTipo, setTomadorTipo] = useState<"PJ" | "PF">("PJ");
   const [tomadorId, setTomadorId] = useState("");
   const [nome, setNome] = useState("");
+  const [sugestoesTemplates, setSugestoesTemplates] = useState<string[]>([]);
   const [obrigatorio, setObrigatorio] = useState(true);
   const [lista, setLista] = useState<TemplateRow[]>([]);
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
   const [loadingLista, setLoadingLista] = useState(false);
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState("");
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [editNome, setEditNome] = useState("");
+  const [editObrigatorio, setEditObrigatorio] = useState(true);
+  const [confirmExcluirId, setConfirmExcluirId] = useState<number | null>(null);
 
   async function carregarEmpresas() {
     setLoadingEmpresas(true);
@@ -82,6 +89,21 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
       setClientesPf(data.filter(pfAtivo));
     } catch {
       setClientesPf([]);
+    }
+  }
+
+  async function carregarSugestoesTemplates() {
+    try {
+      const data = await apiFetchJson<string[]>("/api/templates-documentos/sugestoes", { sessao });
+      const opcoes = (data || []).map((item) => (item || "").trim()).filter(Boolean);
+      setSugestoesTemplates(opcoes);
+      setNome((prev) => {
+        if (prev && opcoes.includes(prev)) return prev;
+        return opcoes[0] ?? "";
+      });
+    } catch {
+      setSugestoesTemplates([]);
+      setNome("");
     }
   }
 
@@ -109,6 +131,7 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
   useEffect(() => {
     void carregarEmpresas();
     void carregarClientesPf();
+    void carregarSugestoesTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -141,6 +164,10 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
       setErro("Selecione o tomador (empresa ou pessoa física).");
       return;
     }
+    if (!nome.trim()) {
+      setErro("Selecione um template da lista.");
+      return;
+    }
     try {
       const body =
         tomadorTipo === "PJ"
@@ -162,15 +189,83 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
         sessao
       });
       setOk("Template adicionado.");
-      setNome("");
+      setNome((prev) => (prev && sugestoesTemplates.includes(prev) ? prev : sugestoesTemplates[0] ?? ""));
       setObrigatorio(true);
       await carregarTemplates(tomadorTipo, tomadorId);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao adicionar template.");
+      const msg = e instanceof Error ? e.message : "Erro ao adicionar template.";
+      setErro(formatApiError(msg, "templates"));
     }
   }
 
+  function iniciarEdicao(template: TemplateRow) {
+    setErro("");
+    setOk("");
+    setEditandoId(template.id);
+    setEditNome(template.nome);
+    setEditObrigatorio(template.obrigatorio);
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setEditNome("");
+    setEditObrigatorio(true);
+  }
+
+  async function salvarEdicao() {
+    if (editandoId == null) return;
+    setErro("");
+    setOk("");
+    try {
+      await apiFetchJson(`/api/templates-documentos/${editandoId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          nome: editNome.trim(),
+          obrigatorio: editObrigatorio
+        }),
+        sessao
+      });
+      setOk("Template atualizado.");
+      cancelarEdicao();
+      await carregarTemplates(tomadorTipo, tomadorId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao atualizar template.";
+      setErro(formatApiError(msg, "templates"));
+    }
+  }
+
+  const confirmarExclusaoTemplate = useCallback(async () => {
+    const id = confirmExcluirId;
+    setConfirmExcluirId(null);
+    if (id == null) return;
+    setErro("");
+    setOk("");
+    try {
+      await apiFetchJson(`/api/templates-documentos/${id}`, {
+        method: "DELETE",
+        sessao
+      });
+      if (editandoId === id) cancelarEdicao();
+      setOk("Template excluído.");
+      await carregarTemplates(tomadorTipo, tomadorId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao excluir template.";
+      setErro(formatApiError(msg, "templates"));
+    }
+  }, [confirmExcluirId, editandoId, tomadorTipo, tomadorId, sessao]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
+    <>
+    <ConfirmDialog
+      open={confirmExcluirId != null}
+      title="Excluir template"
+      message="Deseja excluir este template?"
+      confirmLabel="Excluir"
+      cancelLabel="Cancelar"
+      danger
+      onConfirm={() => void confirmarExclusaoTemplate()}
+      onCancel={() => setConfirmExcluirId(null)}
+    />
     <section className="page">
       <h2>Template de documentos</h2>
       <p className="muted-react">Defina documentos por empresa (CNPJ) ou por cliente pessoa física (CPF).</p>
@@ -223,21 +318,30 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
           </label>
         )}
         <label>
-          Documento
-          <input
-            type="text"
+          Template de documento (carrossel IA)
+          <select
             value={nome}
             onChange={(e) => setNome(e.target.value)}
-            placeholder="Ex.: Guia DAS, IRPF, extrato…"
             required
-          />
+          >
+            <option value="">— Selecione —</option>
+            {sugestoesTemplates.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="check-react">
           <input type="checkbox" checked={obrigatorio} onChange={(e) => setObrigatorio(e.target.checked)} />
           Obrigatório
         </label>
         <button type="submit">Adicionar template</button>
-        {erro ? <p className="erro">{erro}</p> : null}
+        {erro ? (
+          <p className="erro" role="alert" aria-live="assertive">
+            {erro}
+          </p>
+        ) : null}
         {ok ? <p className="ok">{ok}</p> : null}
       </form>
 
@@ -253,13 +357,61 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
               <tr>
                 <th>Documento</th>
                 <th>Obrigatório</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {lista.map((t) => (
                 <tr key={t.id}>
-                  <td>{t.nome}</td>
-                  <td>{t.obrigatorio ? "Sim" : "Não"}</td>
+                  <td>
+                    {editandoId === t.id ? (
+                      <input
+                        type="text"
+                        value={editNome}
+                        onChange={(e) => setEditNome(e.target.value)}
+                        aria-label="Nome do template"
+                      />
+                    ) : (
+                      t.nome
+                    )}
+                  </td>
+                  <td>
+                    {editandoId === t.id ? (
+                      <label className="check-react">
+                        <input
+                          type="checkbox"
+                          checked={editObrigatorio}
+                          onChange={(e) => setEditObrigatorio(e.target.checked)}
+                        />
+                        Obrigatório
+                      </label>
+                    ) : t.obrigatorio ? (
+                      "Sim"
+                    ) : (
+                      "Não"
+                    )}
+                  </td>
+                  <td>
+                    {editandoId === t.id ? (
+                      <>
+                        <button type="button" className="small" onClick={() => void salvarEdicao()}>
+                          Salvar
+                        </button>
+                        <button type="button" className="small ghost" onClick={cancelarEdicao}>
+                          Cancelar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="small" onClick={() => iniciarEdicao(t)}>
+                          Editar
+                        </button>
+                        <button type="button" className="small danger" onClick={() => setConfirmExcluirId(t.id)}>
+                          Excluir
+                        </button>
+                      </>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -267,5 +419,6 @@ export function TemplatesPage({ sessao }: { sessao: Sessao }) {
         ) : null}
       </div>
     </section>
+    </>
   );
 }

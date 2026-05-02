@@ -24,7 +24,7 @@ public class Empresa {
     @NotBlank
     @Size(min = 14, max = 14)
     @Convert(converter = CpfCnpjCryptoConverter.class)
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true, length = 255)
     private String cnpj;
 
     @NotBlank
@@ -32,7 +32,7 @@ public class Empresa {
     private String razaoSocial;
 
     @Convert(converter = CpfCnpjCryptoConverter.class)
-    @Column(length = 100)
+    @Column(length = 255)
     @Pattern(regexp = "^\\d{11}$", message = "cpfResponsavel deve conter 11 digitos.")
     private String cpfResponsavel;
 

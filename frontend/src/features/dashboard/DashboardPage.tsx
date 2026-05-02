@@ -28,6 +28,11 @@ function competenciaAtual() {
   return { ano: now.getFullYear(), mes: now.getMonth() + 1 };
 }
 
+function competenciaAnterior(ano: number, mes: number) {
+  if (mes > 1) return { ano, mes: mes - 1 };
+  return { ano: ano - 1, mes: 12 };
+}
+
 function contarPendenciasPorStatus(list: Pendencia[]) {
   return list.reduce(
     (acc, p) => {
@@ -75,16 +80,36 @@ export function DashboardPage({ sessao }: { sessao: Sessao }) {
       const errs: string[] = [];
 
       let pendList: Pendencia[] = [];
+      let pendCompetencia = comp;
       let empresasN = 0;
       let iaN = 0;
       let rel: RelatorioEstrategico | null = null;
       let radarData: RadarFiscal | null = null;
 
       try {
-        pendList = await apiFetchJson<Pendencia[]>(
-          `/api/pendencias?ano=${comp.ano}&mes=${comp.mes}&incluirArquivadas=true`,
-          { sessao }
-        );
+        if (sessao.perfil === "CLIENTE") {
+          let anoBusca = comp.ano;
+          let mesBusca = comp.mes;
+          for (let tentativa = 0; tentativa < 6; tentativa++) {
+            const data = await apiFetchJson<Pendencia[]>(
+              `/api/pendencias?ano=${anoBusca}&mes=${mesBusca}&incluirArquivadas=true`,
+              { sessao }
+            );
+            pendList = data;
+            pendCompetencia = { ano: anoBusca, mes: mesBusca };
+            if (data.length > 0) {
+              break;
+            }
+            const anterior = competenciaAnterior(anoBusca, mesBusca);
+            anoBusca = anterior.ano;
+            mesBusca = anterior.mes;
+          }
+        } else {
+          pendList = await apiFetchJson<Pendencia[]>(
+            `/api/pendencias?ano=${comp.ano}&mes=${comp.mes}&incluirArquivadas=true`,
+            { sessao }
+          );
+        }
       } catch {
         errs.push("pendências");
       }
@@ -136,9 +161,17 @@ export function DashboardPage({ sessao }: { sessao: Sessao }) {
       } else {
         setRadar(null);
         const emAberto = st.PENDENTE + st.ENVIADO;
+        const houveFallback =
+          pendList.length > 0 && (pendCompetencia.ano !== comp.ano || pendCompetencia.mes !== comp.mes);
+        const competenciaTexto = `${String(pendCompetencia.mes).padStart(2, "0")}/${pendCompetencia.ano}`;
+        const labelPendencias = houveFallback ? "Pendências da competência exibida" : "Pendências no mês";
+        const hintPendencias = houveFallback ? `Competência exibida: ${competenciaTexto}.` : pendHint;
+        const hintEmAberto = houveFallback
+          ? `Itens da competência ${competenciaTexto} que ainda exigem ação ou análise.`
+          : "Itens a concluir ou em análise";
         setKpis([
-          { value: pendList.length, label: "Pendências no mês", hint: pendHint },
-          { value: emAberto, label: "Em aberto (pendente + enviado)", hint: "Itens a concluir ou em análise" }
+          { value: pendList.length, label: labelPendencias, hint: hintPendencias },
+          { value: emAberto, label: "Em aberto (pendente + enviado)", hint: hintEmAberto }
         ]);
         setRadarTexto("Visão fiscal disponível no perfil contador.");
       }

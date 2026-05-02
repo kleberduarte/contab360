@@ -1,0 +1,43 @@
+﻿# === Metadados massa Contab360 (gerado por scripts/generate_doc_test_mass.ps1) ===
+# escopo_pendencia (massa): PF
+#   PJ -> nome empresarial de referencia: ACME SERVICOS CONTABEIS LTDA
+#   PF -> nome da pessoa fisica de referencia: Maria Fernanda Costa Oliveira | CPF 529.982.247-25 (52998224725)
+# Ajuste as pendencias para competencia 2026-04 e CNPJ da empresa = 12.345.678/0001-95 (12345678000195) quando aplicavel.
+# tipo_documento_detectado_esperado: FOLHA_PAGAMENTO
+# aba_carrossel_esperada: FOLHA_PAGAMENTO
+# fonte_leitura: texto
+#
+# Estrutura JSON gravada em dadosExtraidosJson (resumo):
+#   fonte, tipoDocumento, status, confianca, camposObrigatorios[], camposExtraidos{}, motivosRevisao[]
+#   + detalhamentoDocumento? + capturaPerfil? (holerite / guia IRPF completos)
+#
+# Chaves tipicas em camposExtraidos para este cenario:
+#   - cnpj
+#   - cnpjPrestador
+#   - cnpjTomador
+#   - valor
+#   - competencia
+#   - vencimento
+#   - tributo
+#   - tipoDocumento
+#   - nomeTrabalhador
+#   - cpf
+#   - detalhamentoDocumento (holerite)
+#   - capturaPerfil=HOLERITE_ESCRITORIO_COMPLETO
+#
+# Notas: Se o parser de holerite preencher minimo, campos tecnicos podem ir para holerite.* no JSON.
+# === Fim metadados / inicio do texto simulado ===
+
+RECIBO DE PAGAMENTO DE SALARIO  -  Holerite
+EMPREGADOR (contratante)
+Razao Social: ACME SERVICOS CONTABEIS LTDA
+CNPJ: 12.345.678/0001-95
+EMPREGADO (contratado)
+Nome: Maria Fernanda Costa Oliveira
+CPF: 529.982.247-25
+Matricula: 8844 | Departamento: Contabilidade | Cargo: Analista
+Competencia: 04/2026
+Proventos: Salario base R$ 4.200,00 | Horas extras R$ 350,00
+Descontos: INSS R$ 514,20 | IRRF R$ 185,60
+Liquido a receber: R$ 3.250,00
+Base FGTS: R$ 4.550,00

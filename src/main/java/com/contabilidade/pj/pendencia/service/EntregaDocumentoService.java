@@ -27,7 +27,6 @@ import com.contabilidade.pj.pendencia.repository.*;
 public class EntregaDocumentoService {
 
     private static final Logger log = LoggerFactory.getLogger(EntregaDocumentoService.class);
-    private static final java.util.Set<String> EXTENSOES_PERMITIDAS = java.util.Set.of("pdf", "xml", "png", "jpg", "jpeg");
     /** Limite de arquivos por requisição de lote (transação independente por arquivo). */
     private static final int ENTREGA_LOTE_MAX_ARQUIVOS = 25;
 
@@ -55,13 +54,18 @@ public class EntregaDocumentoService {
     }
 
     /**
-     * Um arquivo — mesmo contrato de antes: uma transação e {@link IllegalArgumentException} em caso de erro.
+     * Um arquivo — persiste entrega em transação própria; processamento automático roda só após o commit
+     * (evita lock wait no MySQL: INSERT em {@code documentos_processamento} não pode esperar a mesma transação
+     * que ainda não liberou a {@code entrega} referenciada).
      */
     public EntregaDocumento anexar(Long pendenciaId, MultipartFile arquivo, String observacao, Usuario usuarioAtual) {
         if (arquivo == null || arquivo.isEmpty()) {
             throw new IllegalArgumentException("Arquivo obrigatório.");
         }
-        return transactionTemplate.execute(status -> persistirEntregaTransacional(pendenciaId, arquivo, observacao, usuarioAtual));
+        EntregaDocumento salva = transactionTemplate.execute(
+                status -> persistirEntregaTransacional(pendenciaId, arquivo, observacao, usuarioAtual));
+        iniciarProcessamentoComSeguranca(salva);
+        return salva;
     }
 
     /**
@@ -92,6 +96,7 @@ public class EntregaDocumentoService {
                         status -> persistirEntregaTransacional(pendenciaId, arquivo, observacao, usuarioAtual)
                 );
                 sucesso.add(salva);
+                iniciarProcessamentoComSeguranca(salva);
             } catch (RuntimeException ex) {
                 String nome = arquivo.getOriginalFilename() == null ? "(sem nome)" : arquivo.getOriginalFilename();
                 String msg = ex.getMessage() != null ? ex.getMessage() : "Erro ao processar arquivo.";
@@ -133,11 +138,9 @@ public class EntregaDocumentoService {
         if (idx >= 0 && idx < nomeOriginal.length() - 1) {
             extensao = nomeOriginal.substring(idx + 1).toLowerCase();
         }
-        if (!EXTENSOES_PERMITIDAS.contains(extensao)) {
-            throw new IllegalArgumentException("Tipo de arquivo não permitido. Envie PDF, XML, PNG ou JPG.");
-        }
         Long pendenciaId = pendencia.getId();
-        String nomeSalvo = "pendencia-" + pendenciaId + "-" + UUID.randomUUID() + "." + extensao;
+        String sufixoSalvo = extensao.isEmpty() ? "bin" : extensao;
+        String nomeSalvo = "pendencia-" + pendenciaId + "-" + UUID.randomUUID() + "." + sufixoSalvo;
 
         try {
             Files.createDirectories(uploadBasePath);
@@ -155,24 +158,25 @@ public class EntregaDocumentoService {
             pendenciaDocumentoRepository.save(pendencia);
             competenciaArquivamentoService.sincronizarArquivamentoCompetencia(pendencia.getCompetencia().getId());
             EntregaDocumento salva = entregaDocumentoRepository.save(entrega);
-            /*
-             * Processamento da IA na mesma transação: qualquer exceção não tratada fazia rollback de entrega + status.
-             * O envio do cliente deve permanecer gravado; falhas na leitura automática ficam só no log (a fila pode ser reprocessada).
-             */
-            try {
-                documentoInteligenciaService.iniciarProcessamento(salva);
-            } catch (Exception ex) {
-                log.warn(
-                        "Entrega id={} pendenciaId={} salva no disco, mas falhou ao iniciar processamento pela IA: {}",
-                        salva.getId(),
-                        pendenciaId,
-                        ex.getMessage(),
-                        ex
-                );
-            }
             return salva;
         } catch (IOException ex) {
             throw new IllegalArgumentException("Falha ao salvar arquivo.");
+        }
+    }
+
+    /** Após commit da entrega — {@link DocumentoInteligenciaService#iniciarProcessamento(EntregaDocumento)}. */
+    private void iniciarProcessamentoComSeguranca(EntregaDocumento salva) {
+        Long pendenciaId = salva.getPendencia() != null ? salva.getPendencia().getId() : null;
+        try {
+            documentoInteligenciaService.iniciarProcessamento(salva);
+        } catch (Exception ex) {
+            log.warn(
+                    "Entrega id={} pendenciaId={} salva no disco, mas falhou ao iniciar processamento pela IA: {}",
+                    salva.getId(),
+                    pendenciaId,
+                    ex.getMessage(),
+                    ex
+            );
         }
     }
 

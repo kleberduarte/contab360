@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
+import { formatApiError } from "../../lib/errors";
 import { Sessao } from "../../lib/session";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 
@@ -172,7 +173,8 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
       }
       await carregarEmpresas();
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao salvar empresa.");
+      const msg = e instanceof Error ? e.message : "Erro ao salvar empresa.";
+      setErro(formatApiError(msg, "empresas"));
     }
   }
 
@@ -295,7 +297,11 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
               </>
             ) : null}
           </div>
-          {erro ? <p className="erro">{erro}</p> : null}
+          {erro ? (
+            <p className="erro" role="alert" aria-live="assertive">
+              {erro}
+            </p>
+          ) : null}
           {ok ? <p className="ok">{ok}</p> : null}
         </form>
 

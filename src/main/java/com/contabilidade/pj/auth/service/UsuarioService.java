@@ -2,10 +2,15 @@ package com.contabilidade.pj.auth.service;
 
 import com.contabilidade.pj.empresa.entity.Empresa;
 import com.contabilidade.pj.empresa.repository.EmpresaRepository;
+import com.contabilidade.pj.clientepf.ClientePessoaFisica;
+import com.contabilidade.pj.clientepf.ClientePessoaFisicaRepository;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.security.SecureRandom;
+import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.contabilidade.pj.auth.entity.*;
@@ -19,15 +24,18 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final EmpresaRepository empresaRepository;
+    private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final AuthService authService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
             EmpresaRepository empresaRepository,
+            ClientePessoaFisicaRepository clientePessoaFisicaRepository,
             AuthService authService
     ) {
         this.usuarioRepository = usuarioRepository;
         this.empresaRepository = empresaRepository;
+        this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
         this.authService = authService;
     }
 
@@ -56,12 +64,20 @@ public class UsuarioService {
             throw new IllegalArgumentException("Já existe um usuário com este e-mail.");
         }
         Empresa empresa = resolverEmpresa(request.empresaId());
+        ClientePessoaFisica clientePessoaFisica = resolverClientePessoaFisica(
+                request.clientePessoaFisicaId(),
+                novoPerfil,
+                request.nome(),
+                null,
+                empresa == null
+        );
         String senhaTemp = gerarSenhaTemp();
         Usuario usuario = new Usuario();
         usuario.setNome(request.nome().trim());
         usuario.setEmail(email);
         usuario.setPerfil(novoPerfil);
         usuario.setEmpresa(empresa);
+        usuario.setClientePessoaFisica(clientePessoaFisica);
         usuario.setSenhaHash(authService.passwordEncoder().encode(senhaTemp));
         usuario.setAtivo(true);
         usuario.setSenhaTempAtiva(true);
@@ -95,7 +111,18 @@ public class UsuarioService {
         target.setNome(request.nome().trim());
         target.setEmail(email);
         target.setPerfil(novoPerfil);
-        target.setEmpresa(resolverEmpresa(request.empresaId()));
+        Empresa empresaNova = resolverEmpresa(request.empresaId());
+        target.setEmpresa(empresaNova);
+        boolean exigePfClienteNaEdicao = novoPerfil == PerfilUsuario.CLIENTE
+                && empresaNova == null
+                && target.getClientePessoaFisica() == null;
+        target.setClientePessoaFisica(resolverClientePessoaFisica(
+                request.clientePessoaFisicaId(),
+                novoPerfil,
+                request.nome(),
+                target.getClientePessoaFisica(),
+                exigePfClienteNaEdicao
+        ));
         usuarioRepository.save(target);
         return toResponse(target, null);
     }
@@ -198,6 +225,71 @@ public class UsuarioService {
                 .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
     }
 
+    private ClientePessoaFisica resolverClientePessoaFisica(
+            Long clientePessoaFisicaId,
+            PerfilUsuario perfil,
+            String nomeUsuario,
+            ClientePessoaFisica vinculoAtual,
+            boolean obrigatorioQuandoCliente
+    ) {
+        if (perfil != PerfilUsuario.CLIENTE) {
+            return null;
+        }
+        if (clientePessoaFisicaId != null) {
+            return clientePessoaFisicaRepository.findById(clientePessoaFisicaId)
+                    .orElseThrow(() -> new IllegalArgumentException("Cliente pessoa física não encontrado."));
+        }
+        if (nomeUsuario != null && !nomeUsuario.isBlank()) {
+            String nome = nomeUsuario.trim();
+            ClientePessoaFisica exato = clientePessoaFisicaRepository
+                    .findFirstByNomeCompletoIgnoreCase(nome)
+                    .orElse(null);
+            if (exato != null) {
+                return exato;
+            }
+
+            String nomeNormalizado = normalizarNome(nome);
+            List<ClientePessoaFisica> candidatos = new ArrayList<>();
+            for (ClientePessoaFisica pf : clientePessoaFisicaRepository.findAllByAtivoTrueOrderByNomeCompletoAsc()) {
+                String pfNome = pf.getNomeCompleto() == null ? "" : pf.getNomeCompleto().trim();
+                if (pfNome.isBlank()) {
+                    continue;
+                }
+                String pfNormalizado = normalizarNome(pfNome);
+                if (pfNormalizado.equals(nomeNormalizado)) {
+                    candidatos.add(pf);
+                    continue;
+                }
+                if (pfNormalizado.contains(nomeNormalizado) || nomeNormalizado.contains(pfNormalizado)) {
+                    candidatos.add(pf);
+                }
+            }
+            if (candidatos.size() == 1) {
+                return candidatos.get(0);
+            }
+            if (candidatos.size() > 1) {
+                throw new IllegalArgumentException(
+                        "Há mais de um cliente PF compatível com o nome informado. Ajuste o nome do usuário para ficar igual ao cadastro PF."
+                );
+            }
+        }
+        if (obrigatorioQuandoCliente) {
+            throw new IllegalArgumentException(
+                    "Não foi possível vincular automaticamente o cliente PF. Use o mesmo nome do cadastro em Cliente PF."
+            );
+        }
+        return vinculoAtual;
+    }
+
+    private static String normalizarNome(String nome) {
+        String base = Normalizer.normalize(nome == null ? "" : nome, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", " ")
+                .trim();
+        return base;
+    }
+
     private PerfilUsuario parsePerfil(String perfil) {
         try {
             return PerfilUsuario.valueOf(perfil);
@@ -223,6 +315,8 @@ public class UsuarioService {
                 u.getPerfil().name(),
                 u.getEmpresa() != null ? u.getEmpresa().getId() : null,
                 u.getEmpresa() != null ? u.getEmpresa().getRazaoSocial() : null,
+                u.getClientePessoaFisica() != null ? u.getClientePessoaFisica().getId() : null,
+                u.getClientePessoaFisica() != null ? u.getClientePessoaFisica().getNomeCompleto() : null,
                 u.isAtivo(),
                 senhaTempRevelada
         );
@@ -232,7 +326,8 @@ public class UsuarioService {
             @NotBlank String nome,
             @Email @NotBlank String email,
             @NotBlank String perfil,
-            Long empresaId
+            Long empresaId,
+            Long clientePessoaFisicaId
     ) {}
 
     public record UsuarioResponse(
@@ -242,6 +337,8 @@ public class UsuarioService {
             String perfil,
             Long empresaId,
             String empresaNome,
+            Long clientePessoaFisicaId,
+            String clientePessoaFisicaNome,
             boolean ativo,
             String senhaTempRevelada
     ) {}
