@@ -9,6 +9,7 @@ type LoginPayload = {
 
 type LoginResponse = {
   token: string;
+  usuarioId?: number;
   nome: string;
   email: string;
   perfil: string;
@@ -22,11 +23,13 @@ function loginResponseToSessao(data: LoginResponse): Sessao {
   if (!perfil) {
     throw new Error("Perfil inválido na resposta do servidor.");
   }
+  const usuarioId = typeof data.usuarioId === "number" && Number.isFinite(data.usuarioId) ? data.usuarioId : undefined;
   return {
     token: data.token,
     usuarioNome: data.nome ?? "",
     usuarioEmail: data.email ?? "",
     perfil,
+    usuarioId,
     senhaTempAtiva: data.senhaTempAtiva === true,
     empresaId: data.empresaId ?? null,
     clientePessoaFisicaId: data.clientePessoaFisicaId ?? null

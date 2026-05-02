@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.contabilidade.pj.auth.entity.*;
 import com.contabilidade.pj.auth.repository.*;
 import com.contabilidade.pj.auth.entity.PerfilUsuario;
+import com.contabilidade.pj.lgpd.ConsentimentoTitularRepository;
 
 @Service
 public class UsuarioService {
@@ -25,17 +26,23 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final EmpresaRepository empresaRepository;
     private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
+    private final SessaoAcessoRepository sessaoAcessoRepository;
+    private final ConsentimentoTitularRepository consentimentoTitularRepository;
     private final AuthService authService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
             EmpresaRepository empresaRepository,
             ClientePessoaFisicaRepository clientePessoaFisicaRepository,
+            SessaoAcessoRepository sessaoAcessoRepository,
+            ConsentimentoTitularRepository consentimentoTitularRepository,
             AuthService authService
     ) {
         this.usuarioRepository = usuarioRepository;
         this.empresaRepository = empresaRepository;
         this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
+        this.sessaoAcessoRepository = sessaoAcessoRepository;
+        this.consentimentoTitularRepository = consentimentoTitularRepository;
         this.authService = authService;
     }
 
@@ -139,6 +146,12 @@ public class UsuarioService {
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
         if (usuarioAtual.getPerfil() == PerfilUsuario.CONTADOR && target.getPerfil() != PerfilUsuario.CLIENTE) {
             throw new IllegalArgumentException("Contador só pode desativar usuários do tipo CLIENTE.");
+        }
+        if (usuarioAtual.getPerfil() == PerfilUsuario.ADM) {
+            sessaoAcessoRepository.deleteByUsuario_Id(id);
+            consentimentoTitularRepository.deleteByUsuario_Id(id);
+            usuarioRepository.delete(target);
+            return;
         }
         target.setAtivo(false);
         usuarioRepository.save(target);

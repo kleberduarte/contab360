@@ -5,6 +5,8 @@ export type Sessao = {
   usuarioNome: string;
   usuarioEmail: string;
   perfil: PerfilUsuario;
+  /** ID do usuário logado (login). Usado para não oferecer ações contra a própria conta. */
+  usuarioId?: number;
   senhaTempAtiva?: boolean;
   /** Presente quando o cliente está vinculado a uma empresa (PJ). */
   empresaId?: number | null;
@@ -46,11 +48,19 @@ export function normalizeSessao(raw: unknown): Sessao | null {
       : typeof o.clientePessoaFisicaId === "string" && o.clientePessoaFisicaId !== ""
         ? Number(o.clientePessoaFisicaId)
         : null;
+  const usuarioIdRaw = o.usuarioId;
+  const usuarioId =
+    typeof usuarioIdRaw === "number" && Number.isFinite(usuarioIdRaw)
+      ? usuarioIdRaw
+      : typeof usuarioIdRaw === "string" && usuarioIdRaw !== ""
+        ? Number(usuarioIdRaw)
+        : undefined;
   return {
     token: o.token,
     usuarioNome: nome,
     usuarioEmail: email,
     perfil,
+    usuarioId: Number.isFinite(usuarioId as number) ? (usuarioId as number) : undefined,
     senhaTempAtiva: o.senhaTempAtiva === true,
     empresaId: Number.isFinite(empresaId as number) ? (empresaId as number) : null,
     clientePessoaFisicaId: Number.isFinite(clientePessoaFisicaId as number)

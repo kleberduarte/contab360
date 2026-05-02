@@ -15,6 +15,11 @@ public interface PendenciaDocumentoRepository extends JpaRepository<PendenciaDoc
 
     long countByTemplateDocumento_Id(Long templateDocumentoId);
 
+    @Query("select p.id from PendenciaDocumento p where p.templateDocumento.id = :templateId")
+    List<Long> findIdsByTemplateDocumento_Id(@Param("templateId") Long templateId);
+
+    void deleteByTemplateDocumento_Id(Long templateDocumentoId);
+
     List<PendenciaDocumento> findByCompetenciaId(Long competenciaId);
 
     @Query("""
@@ -64,4 +69,9 @@ public interface PendenciaDocumentoRepository extends JpaRepository<PendenciaDoc
             Long templateDocumentoId,
             Long competenciaId
     );
+
+    @Query("select p.id from PendenciaDocumento p where p.empresa.id = :empresaId")
+    List<Long> findIdsByEmpresa_Id(@Param("empresaId") Long empresaId);
+
+    void deleteByEmpresa_Id(Long empresaId);
 }

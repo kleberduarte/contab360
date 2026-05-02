@@ -3,7 +3,9 @@ package com.contabilidade.pj.auth.repository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import com.contabilidade.pj.auth.entity.Usuario;
 import com.contabilidade.pj.auth.entity.PerfilUsuario;
 
@@ -21,4 +23,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     @Query("SELECT u FROM Usuario u LEFT JOIN FETCH u.empresa LEFT JOIN FETCH u.clientePessoaFisica ORDER BY u.nome")
     List<Usuario> findAllComEmpresa();
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Usuario u SET u.empresa = null WHERE u.empresa.id = :empresaId")
+    void clearEmpresaByEmpresaId(@Param("empresaId") Long empresaId);
 }

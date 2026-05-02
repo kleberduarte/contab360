@@ -74,6 +74,7 @@ function empresaAtiva(empresa: Empresa): boolean {
 }
 
 export function EmpresasPage({ sessao }: { sessao: Sessao }) {
+  const isAdm = sessao.perfil === "ADM";
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -191,12 +192,12 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
     try {
       await apiFetchJson(`/api/empresas/${id}`, { method: "DELETE", sessao });
       if (editandoId === id) limparEdicao();
-      setOk("Empresa desativada.");
+      setOk(isAdm ? "Empresa excluída do sistema." : "Empresa desativada.");
       await carregarEmpresas();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível desativar.");
     }
-  }, [confirmEmpresaId, editandoId, sessao]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirmEmpresaId, editandoId, sessao, isAdm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function reativarEmpresa(id: number) {
     setErro("");
@@ -215,7 +216,11 @@ export function EmpresasPage({ sessao }: { sessao: Sessao }) {
     <ConfirmDialog
       open={confirmEmpresaId != null}
       title="Desativar empresa"
-      message="A empresa será desativada e ocultada dos cadastros. Pendências, templates e usuários permanecem no histórico. Você pode reativá-la depois."
+      message={
+        isAdm
+          ? "Como administrador, esta ação remove a empresa do cadastro (exclusão permanente): templates, pendências e entregas vinculadas serão apagados; usuários desta empresa ficam sem empresa. Pedidos de certificado digital desta empresa também serão removidos. Não é possível reativar."
+          : "A empresa será desativada e ocultada dos cadastros. Pendências, templates e usuários permanecem no histórico. Você pode reativá-la depois."
+      }
       confirmLabel="Desativar"
       cancelLabel="Cancelar"
       danger

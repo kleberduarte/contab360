@@ -1,5 +1,6 @@
 package com.contabilidade.pj.fiscal.controller;
 
+import com.contabilidade.pj.api.SafeContentDisposition;
 import com.contabilidade.pj.auth.service.AuthContext;
 import com.contabilidade.pj.auth.entity.Usuario;
 import jakarta.validation.Valid;
@@ -53,7 +54,7 @@ public class FiscalController {
     public ResponseEntity<byte[]> danfeSimulacaoPdf(@PathVariable Long id) throws IOException {
         byte[] pdf = fiscalService.gerarDanfeSimulacaoPdf(id, AuthContext.get());
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"danfe-simulacao-" + id + ".pdf\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, SafeContentDisposition.attachment("danfe-simulacao-" + id + ".pdf"))
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }

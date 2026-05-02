@@ -2,6 +2,14 @@ package com.contabilidade.pj.empresa.service;
 
 import com.contabilidade.pj.auth.entity.PerfilUsuario;
 import com.contabilidade.pj.auth.entity.Usuario;
+import com.contabilidade.pj.auth.repository.UsuarioRepository;
+import com.contabilidade.pj.fiscal.repository.CertificadoDigitalPedidoRepository;
+import com.contabilidade.pj.pendencia.repository.DocumentoDadoExtraidoRepository;
+import com.contabilidade.pj.pendencia.repository.DocumentoProcessamentoRepository;
+import com.contabilidade.pj.pendencia.repository.EntregaDocumentoRepository;
+import com.contabilidade.pj.pendencia.repository.PendenciaDocumentoRepository;
+import com.contabilidade.pj.pendencia.repository.RevisaoDocumentoHistoricoRepository;
+import com.contabilidade.pj.pendencia.repository.TemplateDocumentoRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,9 +20,35 @@ import com.contabilidade.pj.empresa.repository.*;
 public class EmpresaService {
 
     private final EmpresaRepository empresaRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final PendenciaDocumentoRepository pendenciaDocumentoRepository;
+    private final RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository;
+    private final DocumentoDadoExtraidoRepository documentoDadoExtraidoRepository;
+    private final DocumentoProcessamentoRepository documentoProcessamentoRepository;
+    private final EntregaDocumentoRepository entregaDocumentoRepository;
+    private final TemplateDocumentoRepository templateDocumentoRepository;
+    private final CertificadoDigitalPedidoRepository certificadoDigitalPedidoRepository;
 
-    public EmpresaService(EmpresaRepository empresaRepository) {
+    public EmpresaService(
+            EmpresaRepository empresaRepository,
+            UsuarioRepository usuarioRepository,
+            PendenciaDocumentoRepository pendenciaDocumentoRepository,
+            RevisaoDocumentoHistoricoRepository revisaoDocumentoHistoricoRepository,
+            DocumentoDadoExtraidoRepository documentoDadoExtraidoRepository,
+            DocumentoProcessamentoRepository documentoProcessamentoRepository,
+            EntregaDocumentoRepository entregaDocumentoRepository,
+            TemplateDocumentoRepository templateDocumentoRepository,
+            CertificadoDigitalPedidoRepository certificadoDigitalPedidoRepository
+    ) {
         this.empresaRepository = empresaRepository;
+        this.usuarioRepository = usuarioRepository;
+        this.pendenciaDocumentoRepository = pendenciaDocumentoRepository;
+        this.revisaoDocumentoHistoricoRepository = revisaoDocumentoHistoricoRepository;
+        this.documentoDadoExtraidoRepository = documentoDadoExtraidoRepository;
+        this.documentoProcessamentoRepository = documentoProcessamentoRepository;
+        this.entregaDocumentoRepository = entregaDocumentoRepository;
+        this.templateDocumentoRepository = templateDocumentoRepository;
+        this.certificadoDigitalPedidoRepository = certificadoDigitalPedidoRepository;
     }
 
     @Transactional(readOnly = true)
@@ -63,8 +97,8 @@ public class EmpresaService {
 
     @Transactional
     public Empresa atualizar(Long id, Empresa dados, Usuario usuarioAtual) {
-        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
-            throw new IllegalArgumentException("Apenas contador pode editar empresa.");
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR && usuarioAtual.getPerfil() != PerfilUsuario.ADM) {
+            throw new IllegalArgumentException("Sem permissão para editar empresa.");
         }
         Empresa existente = empresaRepository
                 .findById(id)
@@ -98,23 +132,45 @@ public class EmpresaService {
         return empresaRepository.save(existente);
     }
 
-    /** Exclusão lógica: empresa deixa de ser listada nas operações correntes; histórico e vínculos permanecem. */
+    /**
+     * Contador: exclusão lógica. Administrador: remove empresa, templates, pendências (e filhos) e pedidos de certificado;
+     * usuários com este vínculo ficam sem empresa.
+     */
     @Transactional
     public void excluir(Long id, Usuario usuarioAtual) {
-        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
-            throw new IllegalArgumentException("Apenas contador pode desativar empresa.");
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR && usuarioAtual.getPerfil() != PerfilUsuario.ADM) {
+            throw new IllegalArgumentException("Sem permissão para desativar empresa.");
         }
         Empresa empresa = empresaRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Empresa não encontrada."));
+        if (usuarioAtual.getPerfil() == PerfilUsuario.ADM) {
+            excluirEmpresaDefinitivamente(id);
+            return;
+        }
         if (empresa.isAtivo()) {
             empresaRepository.atualizarAtivo(id, false);
         }
     }
 
+    private void excluirEmpresaDefinitivamente(Long empresaId) {
+        List<Long> pendenciaIds = pendenciaDocumentoRepository.findIdsByEmpresa_Id(empresaId);
+        if (!pendenciaIds.isEmpty()) {
+            revisaoDocumentoHistoricoRepository.deleteByProcessamento_Entrega_Pendencia_IdIn(pendenciaIds);
+            documentoDadoExtraidoRepository.deleteByProcessamento_Entrega_Pendencia_IdIn(pendenciaIds);
+            documentoProcessamentoRepository.deleteByEntrega_Pendencia_IdIn(pendenciaIds);
+            entregaDocumentoRepository.deleteByPendencia_IdIn(pendenciaIds);
+            pendenciaDocumentoRepository.deleteByEmpresa_Id(empresaId);
+        }
+        templateDocumentoRepository.deleteByEmpresa_Id(empresaId);
+        certificadoDigitalPedidoRepository.deleteByEmpresa_Id(empresaId);
+        usuarioRepository.clearEmpresaByEmpresaId(empresaId);
+        empresaRepository.deleteById(empresaId);
+    }
+
     @Transactional
     public Empresa reativar(Long id, Usuario usuarioAtual) {
-        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR) {
-            throw new IllegalArgumentException("Apenas contador pode reativar empresa.");
+        if (usuarioAtual.getPerfil() != PerfilUsuario.CONTADOR && usuarioAtual.getPerfil() != PerfilUsuario.ADM) {
+            throw new IllegalArgumentException("Sem permissão para reativar empresa.");
         }
         Empresa empresa = empresaRepository
                 .findById(id)
