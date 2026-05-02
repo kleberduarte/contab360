@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetchJson } from "../../lib/api";
 import { Sessao } from "../../lib/session";
+import { getSubscriptionStatus, subscribeToPush, unsubscribeFromPush } from "../../lib/pushNotification";
 
 type Pendencia = {
   id: number;
@@ -38,6 +39,9 @@ export function ClientePendenciasPage({ sessao }: { sessao: Sessao }) {
   const [erro, setErro] = useState("");
   const [infoCompetencia, setInfoCompetencia] = useState("");
   const [dadosModal, setDadosModal] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<"granted" | "denied" | "default" | "unsupported">("default");
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushTestMsg, setPushTestMsg] = useState("");
 
   async function carregar() {
     setLoading(true);
@@ -87,12 +91,116 @@ export function ClientePendenciasPage({ sessao }: { sessao: Sessao }) {
 
   useEffect(() => {
     void carregar();
+    void getSubscriptionStatus().then(setPushStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function handlePushToggle() {
+    setPushLoading(true);
+    setPushTestMsg("");
+    try {
+      if (pushStatus === "granted") {
+        await unsubscribeFromPush(sessao.token);
+        setPushStatus("default");
+      } else {
+        const ok = await subscribeToPush(sessao.token);
+        setPushStatus(ok ? "granted" : await getSubscriptionStatus());
+      }
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  async function handlePushTestSend() {
+    setPushLoading(true);
+    setErro("");
+    setPushTestMsg("");
+    try {
+      const r = await apiFetchJson<{ ok: boolean; sent: number }>("/api/push/test-notify", {
+        method: "POST",
+        sessao,
+      });
+      setPushTestMsg(
+        r.sent > 0
+          ? `Teste enviado (${r.sent} dispositivo(s)). Confira a bandeja de notificações do Windows e minimize o navegador se não aparecer.`
+          : "Nenhum envio com sucesso — veja o log do servidor."
+      );
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha no teste de push.");
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
   return (
     <section className="page">
-      <h2>Minhas pendências</h2>
+      <div className="page-header-row">
+        <h2>Minhas pendências</h2>
+        {pushStatus !== "unsupported" && pushStatus !== "denied" && (
+          <div className="push-header-actions">
+            <button
+              type="button"
+              className={`ghost small-btn push-toggle-btn${pushStatus === "granted" ? " push-toggle-btn--active" : ""}`}
+              onClick={() => void handlePushToggle()}
+              disabled={pushLoading}
+              title={pushStatus === "granted" ? "Desativar notificações" : "Ativar notificações de novas pendências"}
+            >
+              {pushStatus === "granted" ? "🔔 Notificações ativas" : "🔕 Ativar notificações"}
+            </button>
+            {pushStatus === "granted" ? (
+              <button
+                type="button"
+                className="ghost small-btn"
+                disabled={pushLoading}
+                title="Envia uma notificação de teste pelo servidor"
+                onClick={() => void handlePushTestSend()}
+              >
+                Testar envio
+              </button>
+            ) : null}
+          </div>
+        )}
+        {pushStatus === "denied" && (
+          <div className="push-denied-help">
+            <p className="push-denied-help__compact">
+              <strong>Bloqueado pelo navegador.</strong> Abra o ícone ao lado do endereço →{" "}
+              <strong>Notificações → Permitir</strong>, depois:
+            </p>
+            <button
+              type="button"
+              className="ghost small-btn push-denied-help__recheck"
+              disabled={pushLoading}
+              onClick={() => {
+                setPushLoading(true);
+                void getSubscriptionStatus()
+                  .then(setPushStatus)
+                  .finally(() => setPushLoading(false));
+              }}
+            >
+              Verificar de novo
+            </button>
+            <details className="push-denied-help__details">
+              <summary>Onde achar nas configurações</summary>
+              <ul>
+                <li>
+                  <strong>Chrome / Edge:</strong> ⋮ → Privacidade e segurança → Configurações do site → Notificações.
+                </li>
+                <li>
+                  <strong>Firefox:</strong> ícone na URL → Permissões → Notificações.
+                </li>
+                <li>
+                  Em produção é preciso <strong>HTTPS</strong>; em desenvolvimento, <code>localhost</code> basta.
+                </li>
+              </ul>
+            </details>
+          </div>
+        )}
+      </div>
+      {pushTestMsg ? (
+        <p className="cliente-push-test-msg" role="status">
+          {pushTestMsg}
+        </p>
+      ) : null}
       <form className="cliente-filtro-react" onSubmit={onFiltro}>
         <label>
           Ano

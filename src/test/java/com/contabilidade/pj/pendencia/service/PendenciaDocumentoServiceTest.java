@@ -17,6 +17,7 @@ import com.contabilidade.pj.pendencia.entity.PendenciaStatus;
 import com.contabilidade.pj.pendencia.repository.CompetenciaMensalRepository;
 import com.contabilidade.pj.pendencia.repository.PendenciaDocumentoRepository;
 import com.contabilidade.pj.pendencia.repository.TemplateDocumentoRepository;
+import com.contabilidade.pj.push.PushNotificationService;
 import java.lang.reflect.Field;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +41,8 @@ class PendenciaDocumentoServiceTest {
     private ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     @Mock
     private CompetenciaArquivamentoService competenciaArquivamentoService;
+    @Mock
+    private PushNotificationService pushNotificationService;
 
     private PendenciaDocumentoService service;
 
@@ -51,7 +54,8 @@ class PendenciaDocumentoServiceTest {
                 templateDocumentoRepository,
                 empresaRepository,
                 clientePessoaFisicaRepository,
-                competenciaArquivamentoService
+                competenciaArquivamentoService,
+                pushNotificationService
         );
     }
 

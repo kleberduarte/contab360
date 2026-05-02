@@ -29,6 +29,9 @@ prod.env
 # Arquivos enviados em runtime
 uploads/
 
+# Classes extraídas acidentalmente de dependências (ex.: JAR descompactado na raiz)
+nl/
+
 # Arquivos temporarios de JVM (Windows)
 **/hsperfdata_*/
 contab360123/
