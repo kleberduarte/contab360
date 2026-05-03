@@ -116,15 +116,19 @@ export function ClientePendenciasPage({ sessao }: { sessao: Sessao }) {
     setErro("");
     setPushTestMsg("");
     try {
-      const r = await apiFetchJson<{ ok: boolean; sent: number }>("/api/push/test-notify", {
+      const r = await apiFetchJson<{ ok: boolean; sent: number; message?: string }>("/api/push/test-notify", {
         method: "POST",
         sessao,
       });
-      setPushTestMsg(
-        r.sent > 0
-          ? `Teste enviado (${r.sent} dispositivo(s)). Confira a bandeja de notificações do Windows e minimize o navegador se não aparecer.`
-          : "Nenhum envio com sucesso — veja o log do servidor."
-      );
+      if (r.message) {
+        setPushTestMsg(r.message);
+      } else if (r.sent > 0) {
+        setPushTestMsg(
+          `Teste enviado (${r.sent} dispositivo(s)). Confira a bandeja de notificações do Windows e minimize o navegador se não aparecer.`
+        );
+      } else {
+        setPushTestMsg("Nenhum envio com sucesso — veja o log do servidor.");
+      }
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha no teste de push.");
     } finally {
