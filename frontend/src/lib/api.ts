@@ -1,8 +1,12 @@
 import { Sessao } from "./session";
 
-// Em produção (Vercel), aponta para o backend no Railway via VITE_API_BASE_URL.
-// Em desenvolvimento, usa string vazia para aproveitar o proxy do Vite (/api -> localhost:8080).
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+// Em produção (Vercel), VITE_API_BASE_URL deve apontar para o backend (Railway).
+// Em desenvolvimento local, string vazia usa o proxy do Vite (/api -> localhost:8080).
+const RAW_API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "").trim();
+const IS_LOCAL_HOST =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+const API_BASE = RAW_API_BASE || (IS_LOCAL_HOST ? "" : "__CONTAB360_MISSING_API_BASE__");
 
 let _onUnauthorized: (() => void) | null = null;
 
@@ -33,6 +37,9 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
 }
 
 export async function apiFetchJson<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  if (API_BASE === "__CONTAB360_MISSING_API_BASE__") {
+    throw new Error("Configuração de produção ausente: defina VITE_API_BASE_URL no frontend.");
+  }
   const { sessao, headers, ...rest } = options;
   const method = (rest.method || "GET").toUpperCase();
   const isGet = method === "GET";
@@ -84,6 +91,9 @@ export async function apiFetchFormData<T>(
   sessao: Sessao | null,
   timeoutMs: number = REQUEST_TIMEOUT_MS
 ): Promise<T> {
+  if (API_BASE === "__CONTAB360_MISSING_API_BASE__") {
+    throw new Error("Configuração de produção ausente: defina VITE_API_BASE_URL no frontend.");
+  }
   const headers = new Headers();
   if (sessao?.token) {
     headers.set("Authorization", `Bearer ${sessao.token}`);
