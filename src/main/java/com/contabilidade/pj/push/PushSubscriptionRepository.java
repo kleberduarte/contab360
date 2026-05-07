@@ -14,6 +14,7 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
     Optional<PushSubscription> findByEndpoint(String endpoint);
 
     void deleteByEndpoint(String endpoint);
+    void deleteByUsuario_Id(Long usuarioId);
 
     /** Subscriptions de todos os clientes vinculados a uma empresa. */
     @Query("SELECT ps FROM PushSubscription ps WHERE ps.usuario.empresa.id = :empresaId AND ps.usuario.perfil = 'CLIENTE'")

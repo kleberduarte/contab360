@@ -190,12 +190,56 @@
 
     function salvarSessao(sess) {
         session = sess;
-        localStorage.setItem(storageKey, JSON.stringify(sess));
+        const json = JSON.stringify(sess);
+        try {
+            sessionStorage.setItem(storageKey, json);
+            localStorage.removeItem(storageKey);
+        } catch (_) {
+            try {
+                localStorage.setItem(storageKey, json);
+            } catch (__) {
+                /* ignore */
+            }
+        }
     }
 
     function limparSessao() {
         session = null;
-        localStorage.removeItem(storageKey);
+        try {
+            sessionStorage.removeItem(storageKey);
+        } catch (_) {
+            /* ignore */
+        }
+        try {
+            localStorage.removeItem(storageKey);
+        } catch (_) {
+            /* ignore */
+        }
+    }
+
+    function carregarRawSessaoArmazenada() {
+        let raw = null;
+        try {
+            raw = sessionStorage.getItem(storageKey);
+        } catch (_) {
+            /* ignore */
+        }
+        if (!raw) {
+            try {
+                raw = localStorage.getItem(storageKey);
+                if (raw) {
+                    try {
+                        sessionStorage.setItem(storageKey, raw);
+                    } catch (__) {
+                        return raw;
+                    }
+                    localStorage.removeItem(storageKey);
+                }
+            } catch (_) {
+                return null;
+            }
+        }
+        return raw;
     }
 
     function setFeedback(el, text, tipo) {
@@ -1984,7 +2028,14 @@
         });
     }
 
-    logoutBtn.addEventListener("click", () => {
+    logoutBtn.addEventListener("click", async () => {
+        if (session && session.token) {
+            try {
+                await fetch("/api/auth/logout", { method: "POST", headers: headers() });
+            } catch (_) {
+                /* segue e limpa o cliente */
+            }
+        }
         limparSessao();
         setViewByPerfil();
     });
@@ -2784,7 +2835,7 @@
     (async function bootstrap() {
         await loadFeatures();
         try {
-            const raw = localStorage.getItem(storageKey);
+            const raw = carregarRawSessaoArmazenada();
             if (raw) {
                 session = JSON.parse(raw);
                 initAfterLogin().catch(() => {

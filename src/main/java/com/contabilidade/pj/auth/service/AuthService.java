@@ -82,6 +82,15 @@ public class AuthService {
         return usuario;
     }
 
+    /** Remove a sessão do banco (logout explícito ou encerramento do cliente). */
+    @Transactional
+    public void revogarSessao(String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        sessaoAcessoRepository.findByToken(token).ifPresent(sessaoAcessoRepository::delete);
+    }
+
     public BCryptPasswordEncoder passwordEncoder() {
         return passwordEncoder;
     }
