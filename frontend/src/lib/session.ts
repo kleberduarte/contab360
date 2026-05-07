@@ -69,33 +69,9 @@ export function normalizeSessao(raw: unknown): Sessao | null {
   };
 }
 
-function rawSessaoArmazenada(): string | null {
-  try {
-    const fromSession = sessionStorage.getItem(STORAGE_KEY);
-    if (fromSession) return fromSession;
-  } catch {
-    /* sessionStorage indisponível */
-  }
-  try {
-    const fromLocal = localStorage.getItem(STORAGE_KEY);
-    if (fromLocal) {
-      try {
-        sessionStorage.setItem(STORAGE_KEY, fromLocal);
-      } catch {
-        /* mantém só no localStorage neste navegador */
-        return fromLocal;
-      }
-      localStorage.removeItem(STORAGE_KEY);
-    }
-    return fromLocal;
-  } catch {
-    return null;
-  }
-}
-
 export function getSessao(): Sessao | null {
   try {
-    const raw = rawSessaoArmazenada();
+    const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     return normalizeSessao(JSON.parse(raw) as unknown);
   } catch {
@@ -104,23 +80,16 @@ export function getSessao(): Sessao | null {
 }
 
 export function setSessao(sessao: Sessao): void {
-  const json = JSON.stringify(sessao);
   try {
-    sessionStorage.setItem(STORAGE_KEY, json);
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(sessao));
   } catch {
-    localStorage.setItem(STORAGE_KEY, json);
+    /* sessionStorage indisponível — sessão não persistida */
   }
 }
 
 export function clearSessao(): void {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-  try {
-    localStorage.removeItem(STORAGE_KEY);
   } catch {
     /* ignore */
   }

@@ -72,7 +72,12 @@ public class AuthInterceptor implements HandlerInterceptor {
     private void escreverErro(HttpServletResponse response, int status, String message) throws Exception {
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        String payload = "{\"message\":\"" + message.replace("\"", "'") + "\"}";
-        response.getWriter().write(payload);
+        String safe = message == null ? "" : message
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+        response.getWriter().write("{\"message\":\"" + safe + "\"}");
     }
 }
