@@ -23,7 +23,7 @@ import {
   UsuariosPage
 } from "./routes/lazyPages";
 import { clearSessao, getSessao, PerfilUsuario, Sessao, setSessao } from "./lib/session";
-import { setOnUnauthorized } from "./lib/api";
+import { apiFetchJson, setOnUnauthorized } from "./lib/api";
 import { HeaderUserMenu } from "./components/HeaderUserMenu";
 import { useNavigate } from "react-router-dom";
 import { PrivacyPolicyModal } from "./features/lgpd/PrivacyPolicyModal";
@@ -530,10 +530,16 @@ export function App() {
   }
 
   function onLogout() {
+    const atual = sessao;
     clearSessao();
     setSessaoState(null);
     setConsentimentoPendente(false);
     window.history.replaceState(null, "", "/login");
+    if (atual?.token) {
+      void apiFetchJson<void>("/api/auth/logout", { method: "POST", sessao: atual }).catch(() => {
+        /* sessão já removida no cliente; revogação no servidor é melhor-esforço */
+      });
+    }
   }
 
   function onNomeAtualizado(novoNome: string) {

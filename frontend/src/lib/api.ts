@@ -19,9 +19,14 @@ const REQUEST_TIMEOUT_MS = 20000;
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timer = window.setTimeout(() => controller.abort("timeout"), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Tempo limite da requisição excedido. Tente novamente.");
+    }
+    throw error;
   } finally {
     window.clearTimeout(timer);
   }

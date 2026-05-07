@@ -51,6 +51,21 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest httpRequest) {
+        String token = extrairBearerToken(httpRequest);
+        authService.revogarSessao(token);
+        return ResponseEntity.noContent().build();
+    }
+
+    private static String extrairBearerToken(HttpServletRequest req) {
+        String authHeader = req.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Token de acesso ausente.");
+        }
+        return authHeader.substring("Bearer ".length()).trim();
+    }
+
     private String obterIp(HttpServletRequest req) {
         String forwarded = req.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {

@@ -17,6 +17,7 @@ import com.contabilidade.pj.auth.entity.*;
 import com.contabilidade.pj.auth.repository.*;
 import com.contabilidade.pj.auth.entity.PerfilUsuario;
 import com.contabilidade.pj.lgpd.ConsentimentoTitularRepository;
+import com.contabilidade.pj.push.PushSubscriptionRepository;
 
 @Service
 public class UsuarioService {
@@ -28,6 +29,7 @@ public class UsuarioService {
     private final ClientePessoaFisicaRepository clientePessoaFisicaRepository;
     private final SessaoAcessoRepository sessaoAcessoRepository;
     private final ConsentimentoTitularRepository consentimentoTitularRepository;
+    private final PushSubscriptionRepository pushSubscriptionRepository;
     private final AuthService authService;
 
     public UsuarioService(
@@ -36,6 +38,7 @@ public class UsuarioService {
             ClientePessoaFisicaRepository clientePessoaFisicaRepository,
             SessaoAcessoRepository sessaoAcessoRepository,
             ConsentimentoTitularRepository consentimentoTitularRepository,
+            PushSubscriptionRepository pushSubscriptionRepository,
             AuthService authService
     ) {
         this.usuarioRepository = usuarioRepository;
@@ -43,6 +46,7 @@ public class UsuarioService {
         this.clientePessoaFisicaRepository = clientePessoaFisicaRepository;
         this.sessaoAcessoRepository = sessaoAcessoRepository;
         this.consentimentoTitularRepository = consentimentoTitularRepository;
+        this.pushSubscriptionRepository = pushSubscriptionRepository;
         this.authService = authService;
     }
 
@@ -150,6 +154,7 @@ public class UsuarioService {
         if (usuarioAtual.getPerfil() == PerfilUsuario.ADM) {
             sessaoAcessoRepository.deleteByUsuario_Id(id);
             consentimentoTitularRepository.deleteByUsuario_Id(id);
+            pushSubscriptionRepository.deleteByUsuario_Id(id);
             usuarioRepository.delete(target);
             return;
         }

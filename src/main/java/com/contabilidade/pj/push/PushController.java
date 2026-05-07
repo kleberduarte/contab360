@@ -40,7 +40,10 @@ public class PushController {
         return ResponseEntity.ok().build();
     }
 
-    /** Diagnóstico: envia push de teste para o usuário logado (cliente com subscription). */
+    /**
+     * Diagnóstico: envia push de teste para o usuário logado.
+     * Resposta sempre 200 com corpo JSON (evita 400 no navegador); ver {@code ok}, {@code sent} e {@code message}.
+     */
     @PostMapping("/test-notify")
     public ResponseEntity<Map<String, Object>> testNotify() {
         Usuario usuario = AuthContext.get();
@@ -49,9 +52,17 @@ public class PushController {
         }
         try {
             int sent = pushNotificationService.enviarTesteParaUsuario(usuario);
+            if (sent <= 0) {
+                return ResponseEntity.ok(Map.of(
+                        "ok", false,
+                        "sent", 0,
+                        "message",
+                        "Nenhum envio aceito pelo gateway (FCM). Veja o log do servidor ou tente ativar as notificações de novo."));
+            }
             return ResponseEntity.ok(Map.of("ok", true, "sent", sent));
         } catch (IllegalStateException ex) {
-            return ResponseEntity.badRequest().body(Map.of("ok", false, "message", ex.getMessage()));
+            String msg = ex.getMessage() != null ? ex.getMessage() : "Push indisponível para teste.";
+            return ResponseEntity.ok(Map.of("ok", false, "sent", 0, "message", msg));
         }
     }
 
