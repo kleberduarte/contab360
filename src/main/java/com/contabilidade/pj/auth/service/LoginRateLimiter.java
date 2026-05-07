@@ -8,8 +8,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 
 /**
- * Bloqueia IPs com excesso de tentativas de login falhas (brute-force).
- * Janela deslizante: máx. 5 falhas em 15 minutos por IP.
+ * Bloqueia chaves de tentativa com excesso de falhas (brute-force).
+ * A chave pode combinar email + IP para evitar bloqueio global atrás de proxy/NAT.
+ * Janela deslizante: máx. 5 falhas em 15 minutos por chave.
  */
 @Component
 public class LoginRateLimiter {
