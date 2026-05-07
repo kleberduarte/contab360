@@ -60,12 +60,12 @@ public class AuthSeedConfig {
             log.debug("Não foi necessário/possível alterar enum de perfil automaticamente: {}", ex.getMessage());
         }
         try {
-            // Corrige usuários que ficaram com ativo=0 por migration sem DEFAULT.
+            // Corrige apenas linhas com NULL (migration sem DEFAULT). Não toca em ativo=0 intencional.
             int corrigidos = jdbcTemplate.update(
-                    "UPDATE usuarios SET ativo = 1 WHERE ativo = 0 OR ativo IS NULL"
+                    "UPDATE usuarios SET ativo = 1 WHERE ativo IS NULL"
             );
             if (corrigidos > 0) {
-                log.warn("Migration usuarios.ativo: {} usuário(s) reativado(s).", corrigidos);
+                log.warn("Migration usuarios.ativo: {} usuário(s) corrigido(s) (ativo era NULL).", corrigidos);
             }
         } catch (Exception ex) {
             log.debug("Migration usuarios.ativo não necessária ou falhou: {}", ex.getMessage());

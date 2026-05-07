@@ -1,4 +1,4 @@
-import { Sessao } from "./session";
+import { Sessao, clearSessao } from "./session";
 
 // Em produção (Vercel), VITE_API_BASE_URL deve apontar para o backend (Railway).
 // Em desenvolvimento local, string vazia usa o proxy do Vite (/api -> localhost:8080).
@@ -63,9 +63,6 @@ export async function apiFetchJson<T>(url: string, options: RequestOptions = {})
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      _onUnauthorized?.();
-    }
     const text = await response.text();
     let msg = text || `Erro HTTP ${response.status}`;
     try {
@@ -73,6 +70,10 @@ export async function apiFetchJson<T>(url: string, options: RequestOptions = {})
       if (err?.message) msg = err.message;
     } catch {
       // resposta não é JSON, mantém texto original
+    }
+    if (response.status === 401) {
+      clearSessao();
+      _onUnauthorized?.();
     }
     throw new Error(msg);
   }
@@ -110,15 +111,16 @@ export async function apiFetchFormData<T>(
   );
   const text = await response.text();
   if (!response.ok) {
-    if (response.status === 401) {
-      _onUnauthorized?.();
-    }
     let msg = text || `Erro HTTP ${response.status}`;
     try {
       const err = JSON.parse(text) as { message?: string };
       if (err.message) msg = err.message;
     } catch {
       /* texto não é JSON */
+    }
+    if (response.status === 401) {
+      clearSessao();
+      _onUnauthorized?.();
     }
     throw new Error(msg);
   }
