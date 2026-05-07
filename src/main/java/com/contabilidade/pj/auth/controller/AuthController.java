@@ -36,17 +36,17 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthService.LoginResponse login(@Valid @RequestBody LoginRequest req, HttpServletRequest httpRequest) {
-        String ip = obterIp(httpRequest);
-        if (rateLimiter.isoBloqueado(ip)) {
+        String chaveTentativa = montarChaveTentativa(req.email(), httpRequest);
+        if (rateLimiter.isoBloqueado(chaveTentativa)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Muitas tentativas de login. Aguarde 15 minutos.");
         }
         try {
             AuthService.LoginResponse resposta = authService.login(req.email(), req.senha());
-            rateLimiter.registrarSucesso(ip);
+            rateLimiter.registrarSucesso(chaveTentativa);
             return resposta;
         } catch (IllegalArgumentException ex) {
-            rateLimiter.registrarFalha(ip);
+            rateLimiter.registrarFalha(chaveTentativa);
             throw ex;
         }
     }
@@ -66,12 +66,24 @@ public class AuthController {
         return authHeader.substring("Bearer ".length()).trim();
     }
 
+    private String montarChaveTentativa(String email, HttpServletRequest req) {
+        String emailNormalizado = email == null ? "" : email.trim().toLowerCase();
+        return emailNormalizado + "|" + obterIp(req);
+    }
+
     private String obterIp(HttpServletRequest req) {
-        String forwarded = req.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        String[] headers = {"X-Forwarded-For", "CF-Connecting-IP", "X-Real-IP"};
+        for (String header : headers) {
+            String valor = req.getHeader(header);
+            if (valor == null || valor.isBlank()) {
+                continue;
+            }
+            String ip = valor.split(",")[0].trim();
+            if (!ip.isBlank()) {
+                return ip;
+            }
         }
-        return req.getRemoteAddr();
+        return req.getRemoteAddr() == null ? "unknown" : req.getRemoteAddr();
     }
 
     @PutMapping("/senha")
